@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase-server'
 import { CATEGORY_LABELS, STATUS_LABELS, Badge } from '@/components/shared'
 
@@ -14,7 +15,6 @@ export default async function AdminDashboard() {
   const approved = reqs.filter((r: any) => r.status === 'approved').length
   const pending = reqs.filter((r: any) => !['approved', 'rejected'].includes(r.status)).length
 
-  // นับตามด้าน
   const byCat: Record<string, number> = {}
   reqs.forEach((r: any) => { byCat[r.category] = (byCat[r.category] ?? 0) + 1 })
 
@@ -22,6 +22,12 @@ export default async function AdminDashboard() {
     <>
       <h1 className="page-title">Dashboard ภาพรวม — ส.อ.ท. / FTI</h1>
       <p className="page-sub">ติดตามผลแบบ Real-time · Zero Waste of Budget</p>
+
+      <div style={{ marginBottom: 18 }}>
+        <Link href="/dashboard/manage-users" className="btn btn-sm" style={{ display: 'inline-block', textDecoration: 'none' }}>
+          จัดการผู้ใช้และสิทธิ์
+        </Link>
+      </div>
 
       <div className="grid grid-3">
         <div className="stat"><div className="n">{total}</div><div className="l">คำขอทั้งหมด</div></div>
