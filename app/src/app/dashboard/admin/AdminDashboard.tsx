@@ -70,3 +70,19 @@ export default async function AdminDashboard() {
                     {reqs.filter((r: any) => r.status === k).length}
                   </td>
                 </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>จัดการคำขอ — คัดกรอง · ส่งต่อ · อนุมัติ</h2>
+        <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>
+          ดำเนินการกับคำขอได้ทุกขั้นตอนในที่เดียว
+        </p>
+        <AdminRequestManager initial={reqList} />
+      </div>
+    </>
+  )
+}
