@@ -1,19 +1,28 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-server'
 import { CATEGORY_LABELS, STATUS_LABELS, Badge } from '@/components/shared'
+import AdminRequestManager from './AdminRequestManager'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
 
   const { data: all } = await supabase
     .from('funding_requests')
-    .select('id, category, status, created_at, sme_profiles(company_name)')
+    .select('id, category, status, detail, created_at, sme_profiles(company_name)')
     .order('created_at', { ascending: false })
 
   const reqs = all ?? []
   const total = reqs.length
   const approved = reqs.filter((r: any) => r.status === 'approved').length
   const pending = reqs.filter((r: any) => !['approved', 'rejected'].includes(r.status)).length
+
+  const reqList = reqs.map((r: any) => ({
+    id: r.id,
+    category: r.category,
+    status: r.status,
+    detail: r.detail,
+    company_name: r.sme_profiles?.company_name ?? null,
+  }))
 
   const byCat: Record<string, number> = {}
   reqs.forEach((r: any) => { byCat[r.category] = (byCat[r.category] ?? 0) + 1 })
@@ -61,28 +70,3 @@ export default async function AdminDashboard() {
                     {reqs.filter((r: any) => r.status === k).length}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="card">
-        <h2>คำขอล่าสุด</h2>
-        <table>
-          <thead><tr><th>กิจการ</th><th>ด้าน</th><th>สถานะ</th><th>วันที่</th></tr></thead>
-          <tbody>
-            {reqs.slice(0, 15).map((r: any) => (
-              <tr key={r.id}>
-                <td>{r.sme_profiles?.company_name}</td>
-                <td>{CATEGORY_LABELS[r.category]}</td>
-                <td><Badge status={r.status} /></td>
-                <td>{new Date(r.created_at).toLocaleDateString('th-TH')}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  )
-}
