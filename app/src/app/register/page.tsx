@@ -25,11 +25,10 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
 
   const set = (k: string) => (e: any) => setForm({ ...form, [k]: e.target.value })
+  const activeOpt = ROLE_OPTIONS.find(o => o.value === roleType)!
 
   async function onSubmit() {
     setErr(''); setOk(''); setLoading(true)
-
-    // ชื่อกิจการ: SME ใช้ companyName, หน่วยงานใช้ orgName
     const companyName = roleType === 'sme' ? form.companyName : form.orgName
 
     const { error } = await supabase.auth.signUp({
@@ -64,33 +63,33 @@ export default function RegisterPage() {
         {err && <div className="alert alert-err">{err}</div>}
         {ok && <div className="alert alert-ok">{ok}</div>}
 
-        {/* เลือกประเภทผู้ใช้ */}
-        <div className="field">
-          <label>ประเภทผู้ใช้</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-            {ROLE_OPTIONS.map(opt => (
-              <div
-                key={opt.value}
-                onClick={() => setRoleType(opt.value)}
-                style={{
-                  border: roleType === opt.value ? '2px solid #1e3a8a' : '1px solid #cbd5e1',
-                  background: roleType === opt.value ? '#eef2ff' : '#fff',
-                  borderRadius: 8, padding: '10px 12px', cursor: 'pointer',
-                }}
-              >
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{opt.label}</div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>{opt.desc}</div>
-              </div>
-            ))}
-          </div>
+        {/* แท็บเลือกประเภทผู้ใช้ */}
+        <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 4, borderRadius: 10, marginBottom: 6 }}>
+          {ROLE_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setRoleType(opt.value)}
+              style={{
+                flex: 1, border: 'none', cursor: 'pointer',
+                borderRadius: 8, padding: '8px 6px', fontSize: 13,
+                fontWeight: roleType === opt.value ? 600 : 400,
+                background: roleType === opt.value ? '#1e3a8a' : 'transparent',
+                color: roleType === opt.value ? '#fff' : '#475569',
+                transition: 'all 0.15s',
+              }}
+            >
+              {opt.value === 'sme' ? 'SME' : opt.value === 'agency' ? 'ผู้ให้บริการ' : 'ที่ปรึกษา'}
+            </button>
+          ))}
         </div>
+        <p style={{ fontSize: 12, color: '#64748b', marginTop: 0, marginBottom: 14 }}>{activeOpt.desc}</p>
 
         <div className="field">
           <label>ชื่อ-นามสกุล ผู้ติดต่อ</label>
           <input value={form.fullName} onChange={set('fullName')} />
         </div>
 
-        {/* ช่องที่ปรับตามประเภท */}
         {roleType === 'sme' && (
           <>
             <div className="field">
