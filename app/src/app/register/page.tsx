@@ -6,19 +6,28 @@ import { createClient } from '@/lib/supabase-browser'
 
 type RoleType = 'sme' | 'agency' | 'expert'
 
-const SERVICE_OPTIONS = ['สินเชื่อ', 'ทุนนวัตกรรม', 'ทุนดิจิทัล', 'โครงการพัฒนาธุรกิจ']
+const PROVINCES = [
+  'กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา',
+  'ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก',
+  'นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน',
+  'บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา',
+  'พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม',
+  'มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง',
+  'ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร',
+  'สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย',
+  'หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี',
+]
 
 export default function RegisterPage() {
   const router = useRouter()
   const supabase = createClient()
   const [roleType, setRoleType] = useState<RoleType>('sme')
   const [form, setForm] = useState({
-    fullName: '', email: '', password: '',
-    taxId: '', companyName: '', ownerName: '', province: '', businessType: '',
-    coordPhone: '', coordEmail: '',
+    email: '', password: '',
+    taxId: '', companyName: '', province: '', businessType: '',
+    coordName: '', coordPhone: '', coordEmail: '',
     orgName: '',
   })
-  const [services, setServices] = useState<string[]>([])
   const [err, setErr] = useState('')
   const [ok, setOk] = useState('')
   const [loading, setLoading] = useState(false)
@@ -27,10 +36,6 @@ export default function RegisterPage() {
   const roleDesc = roleType === 'sme' ? 'ยื่นคำขอรับการสนับสนุน'
     : roleType === 'agency' ? 'ธนาคาร, NIA, depa ฯลฯ (รอ ส.อ.ท. อนุมัติ)'
     : 'คัดกรองคำขอ (รอ ส.อ.ท. อนุมัติ)'
-
-  function toggleService(s: string) {
-    setServices(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
-  }
 
   async function onSubmit() {
     setErr(''); setOk(''); setLoading(true)
@@ -41,16 +46,15 @@ export default function RegisterPage() {
       password: form.password,
       options: {
         data: {
-          full_name: form.fullName,
+          full_name: form.coordName,
           requested_role: roleType,
           company_name: companyName,
           sme_one_id: form.taxId,
           province: form.province,
-          owner_name: form.ownerName,
           business_type: form.businessType,
+          coordinator_name: form.coordName,
           coordinator_phone: form.coordPhone,
           coordinator_email: form.coordEmail,
-          services_wanted: services.join(','),
         },
       },
     })
@@ -88,14 +92,9 @@ export default function RegisterPage() {
         </div>
         <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 14px' }}>{roleDesc}</p>
 
-        <div className="field">
-          <label>ชื่อ-นามสกุล ผู้ติดต่อ</label>
-          <input value={form.fullName} onChange={set('fullName')} />
-        </div>
-
         {roleType === 'sme' && (
           <>
-            <div style={{ fontWeight: 600, fontSize: 14, margin: '16px 0 8px', color: '#1e3a8a' }}>ข้อมูลกิจการ</div>
+            <div style={{ fontWeight: 600, fontSize: 14, margin: '4px 0 8px', color: '#1e3a8a' }}>ข้อมูลกิจการ</div>
             <div className="field">
               <label>เลขนิติบุคคล / เลขผู้เสียภาษี</label>
               <input value={form.taxId} onChange={set('taxId')} />
@@ -105,12 +104,11 @@ export default function RegisterPage() {
               <input value={form.companyName} onChange={set('companyName')} />
             </div>
             <div className="field">
-              <label>ชื่อ-นามสกุล เจ้าของ / ผู้มีอำนาจ</label>
-              <input value={form.ownerName} onChange={set('ownerName')} />
-            </div>
-            <div className="field">
               <label>จังหวัด</label>
-              <input value={form.province} onChange={set('province')} />
+              <select value={form.province} onChange={set('province')}>
+                <option value="">— เลือกจังหวัด —</option>
+                {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
             </div>
             <div className="field">
               <label>ประเภทธุรกิจ</label>
@@ -118,6 +116,10 @@ export default function RegisterPage() {
             </div>
 
             <div style={{ fontWeight: 600, fontSize: 14, margin: '16px 0 8px', color: '#1e3a8a' }}>ผู้ประสานงาน</div>
+            <div className="field">
+              <label>ชื่อ-นามสกุล</label>
+              <input value={form.coordName} onChange={set('coordName')} />
+            </div>
             <div className="field">
               <label>เบอร์โทรศัพท์</label>
               <input value={form.coordPhone} onChange={set('coordPhone')} />
@@ -127,36 +129,34 @@ export default function RegisterPage() {
               <input value={form.coordEmail} onChange={set('coordEmail')} />
             </div>
 
-            <div style={{ fontWeight: 600, fontSize: 14, margin: '16px 0 8px', color: '#1e3a8a' }}>บริการที่ต้องการ</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-              {SERVICE_OPTIONS.map(s => (
-                <button key={s} type="button" onClick={() => toggleService(s)}
-                  style={{
-                    border: services.includes(s) ? '2px solid #1e3a8a' : '1px solid #cbd5e1',
-                    background: services.includes(s) ? '#eef2ff' : '#fff',
-                    color: '#1e293b', borderRadius: 20, padding: '6px 14px', fontSize: 13, cursor: 'pointer',
-                  }}>
-                  {services.includes(s) ? '✓ ' : ''}{s}
-                </button>
-              ))}
-            </div>
-
             <p style={{ fontSize: 12, color: '#94a3b8', margin: '10px 0 0' }}>
-              ข้อมูลกิจการเพิ่มเติม (ที่ตั้ง แบรนด์ มาตรฐาน รางวัล ประวัติส่งออก ฯลฯ) กรอกได้ภายหลังในหน้าโปรไฟล์
+              ข้อมูลกิจการเพิ่มเติมและบริการที่ต้องการ เลือกได้ภายหลังในระบบ
             </p>
           </>
         )}
         {roleType === 'agency' && (
-          <div className="field">
-            <label>ชื่อหน่วยงาน / ผู้ให้บริการ</label>
-            <input value={form.orgName} onChange={set('orgName')} placeholder="เช่น ธนาคารกรุงไทย" />
-          </div>
+          <>
+            <div className="field">
+              <label>ชื่อหน่วยงาน / ผู้ให้บริการ</label>
+              <input value={form.orgName} onChange={set('orgName')} placeholder="เช่น ธนาคารกรุงไทย" />
+            </div>
+            <div className="field">
+              <label>ชื่อ-นามสกุล ผู้ประสานงาน</label>
+              <input value={form.coordName} onChange={set('coordName')} />
+            </div>
+          </>
         )}
         {roleType === 'expert' && (
-          <div className="field">
-            <label>สังกัด / หน่วยงาน (ถ้ามี)</label>
-            <input value={form.orgName} onChange={set('orgName')} />
-          </div>
+          <>
+            <div className="field">
+              <label>สังกัด / หน่วยงาน (ถ้ามี)</label>
+              <input value={form.orgName} onChange={set('orgName')} />
+            </div>
+            <div className="field">
+              <label>ชื่อ-นามสกุล</label>
+              <input value={form.coordName} onChange={set('coordName')} />
+            </div>
+          </>
         )}
 
         <div style={{ fontWeight: 600, fontSize: 14, margin: '16px 0 8px', color: '#1e3a8a' }}>บัญชีเข้าระบบ</div>
