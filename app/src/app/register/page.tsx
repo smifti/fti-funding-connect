@@ -41,6 +41,20 @@ export default function RegisterPage() {
     setErr(''); setOk(''); setLoading(true)
     const companyName = roleType === 'sme' ? form.companyName : form.orgName
 
+    // เช็กเลขนิติบุคคลซ้ำก่อน (เฉพาะ SME ที่กรอกเลข)
+    if (roleType === 'sme' && form.taxId.trim() !== '') {
+      const { data: dup } = await supabase
+        .from('sme_profiles')
+        .select('id')
+        .eq('sme_one_id', form.taxId.trim())
+        .maybeSingle()
+      if (dup) {
+        setLoading(false)
+        setErr('เลขนิติบุคคลนี้มีในระบบแล้ว หากเป็นกิจการของท่าน กรุณาเข้าสู่ระบบ หรือติดต่อ ส.อ.ท.')
+        return
+      }
+    }
+
     const { error } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
@@ -58,7 +72,18 @@ export default function RegisterPage() {
         },
       },
     })
-    if (error) { setLoading(false); setErr(error.message); return }
+    if (error) {
+      setLoading(false)
+      const msg = error.message || ''
+      if (msg.includes('sme_one_id') || msg.includes('duplicate') || msg.includes('Database error')) {
+        setErr('เลขนิติบุคคลนี้มีในระบบแล้ว หากเป็นกิจการของท่าน กรุณาเข้าสู่ระบบ')
+      } else if (msg.includes('already registered') || msg.includes('User already')) {
+        setErr('อีเมลนี้เคยลงทะเบียนแล้ว กรุณาเข้าสู่ระบบ')
+      } else {
+        setErr('เกิดข้อผิดพลาดในการลงทะเบียน กรุณาตรวจสอบข้อมูลแล้วลองใหม่')
+      }
+      return
+    }
 
     setLoading(false)
     if (roleType === 'sme') {
