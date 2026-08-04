@@ -34,7 +34,7 @@ export default async function Dashboard() {
   if (status === 'pending') {
     return (
       <>
-        <TopBar role={role} />
+        <TopBar role={profile?.requested_role ?? role} />
         <main>
           <div className="container">
             <div className="card" style={{ maxWidth: 560, margin: '40px auto', textAlign: 'center', padding: '40px 32px' }}>
