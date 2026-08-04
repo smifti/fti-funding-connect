@@ -46,11 +46,25 @@ export function TopBar({ role }: { role: string }) {
           FTI SME Funding Connect
           <span className="role-pill">{ROLE_LABELS[role] ?? role}</span>
         </div>
-        <form action={signOut}>
-          <button className="btn btn-ghost btn-sm" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
-            ออกจากระบบ
-          </button>
-        </form>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {role === 'admin' && (
+            <>
+              <a href="/dashboard/manage-users" className="btn btn-ghost btn-sm"
+                style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
+                จัดการผู้ใช้
+              </a>
+              <a href="/dashboard/approvals" className="btn btn-ghost btn-sm"
+                style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
+                อนุมัติผู้ใช้
+              </a>
+            </>
+          )}
+          <form action={signOut}>
+            <button className="btn btn-ghost btn-sm" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
+              ออกจากระบบ
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   )
