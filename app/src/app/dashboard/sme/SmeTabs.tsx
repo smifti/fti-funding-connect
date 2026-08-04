@@ -1,8 +1,30 @@
 'use client'
 import { useState } from 'react'
-import { CATEGORY_LABELS, Badge } from '@/components/shared'
 import NewRequestForm from './NewRequestForm'
 import ProfileForm from './ProfileForm'
+
+const CATEGORY_LABELS: Record<string, string> = {
+  credit: 'สินเชื่อ',
+  innovation: 'นวัตกรรม',
+  management: 'บริหารจัดการ',
+  marketing: 'การตลาด',
+  production: 'การผลิต',
+  upskill: 'Upskill / Reskill',
+  other: 'อื่น ๆ (ESG)',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  submitted: 'ยื่นแล้ว',
+  screening: 'กำลังคัดกรอง',
+  forwarded: 'ส่งต่อหน่วยงาน',
+  in_review: 'หน่วยงานพิจารณา',
+  approved: 'สำเร็จ',
+  rejected: 'ไม่ผ่าน',
+}
+
+function Badge({ status }: { status: string }) {
+  return <span className={`badge b-${status}`}>{STATUS_LABELS[status] ?? status}</span>
+}
 
 const REQUIRED_FIELDS = [
   'company_name', 'sme_one_id', 'province', 'business_type',
@@ -43,7 +65,6 @@ export default function SmeTabs({ sme, requests, health }: { sme: any; requests:
         {sme.sme_one_id ? `เลขนิติบุคคล: ${sme.sme_one_id} · ` : ''}{sme.province ?? '—'}
       </p>
 
-      {/* แท็บ */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '1px solid #e2e8f0' }}>
         <button onClick={() => setTab('overview')}
           style={{
