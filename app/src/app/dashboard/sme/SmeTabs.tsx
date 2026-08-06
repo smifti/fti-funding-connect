@@ -1,6 +1,5 @@
 'use client'
 import { useState } from 'react'
-import NewRequestForm from './NewRequestForm'
 import ProfileForm from './ProfileForm'
 import SmePackages from './SmePackages'
 
@@ -14,17 +13,17 @@ const CATEGORY_LABELS: Record<string, string> = {
   other: 'อื่น ๆ (ESG)',
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  submitted: 'ยื่นแล้ว',
-  screening: 'กำลังคัดกรอง',
-  forwarded: 'ส่งต่อหน่วยงาน',
-  in_review: 'หน่วยงานพิจารณา',
-  approved: 'สำเร็จ',
-  rejected: 'ไม่ผ่าน',
-}
-
-function Badge({ status }: { status: string }) {
-  return <span className={`badge b-${status}`}>{STATUS_LABELS[status] ?? status}</span>
+// หมุด timeline
+const STEPS = [
+  { key: 'submitted', label: 'ยื่นสมัคร' },
+  { key: 'screening', label: 'พิจารณาคุณสมบัติ' },
+  { key: 'in_progress', label: 'ดำเนินการ' },
+  { key: 'completed', label: 'เสร็จสิ้น' },
+]
+const STATE_COLOR: Record<string, { border: string; bg: string; fg: string }> = {
+  pending: { border: '#cbd5e1', bg: '#fff', fg: '#94a3b8' },
+  passed: { border: '#16a34a', bg: '#16a34a', fg: '#fff' },
+  failed: { border: '#dc2626', bg: '#dc2626', fg: '#fff' },
 }
 
 const REQUIRED_FIELDS = [
@@ -54,7 +53,48 @@ const STATUS_INFO = {
   red: { color: '#dc2626', bg: '#fee2e2', label: 'ข้อมูลจำเป็นยังไม่ครบ' },
 }
 
-export default function SmeTabs({ sme, requests, health, packages, appliedIds }: { sme: any; requests: any[]; health: any; packages: any[]; appliedIds: string[] }) {
+// Timeline สำหรับ SME (อ่านอย่างเดียว)
+function AppTimeline({ steps }: { steps: Record<string, any> }) {
+  const s = steps ?? {}
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', position: 'relative', marginTop: 10 }}>
+      {STEPS.map((step, i) => {
+        const st = s[step.key]?.state ?? 'pending'
+        const c = STATE_COLOR[st] ?? STATE_COLOR.pending
+        const prevPassed = i > 0 && s[STEPS[i - 1].key]?.state === 'passed'
+        return (
+          <div key={step.key} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
+            {i > 0 && (
+              <div style={{ position: 'absolute', top: 13, left: '-50%', width: '100%', height: 3,
+                background: prevPassed ? '#16a34a' : '#e2e8f0' }} />
+            )}
+            <div style={{
+              position: 'relative', zIndex: 1, margin: '0 auto',
+              width: 28, height: 28, borderRadius: '50%',
+              border: `2px solid ${c.border}`, background: c.bg, color: c.fg,
+              fontSize: 13, fontWeight: 700,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {st === 'passed' ? '✓' : st === 'failed' ? '✕' : i + 1}
+            </div>
+            <div style={{ fontSize: 11, marginTop: 6,
+              color: st === 'passed' ? '#16a34a' : st === 'failed' ? '#dc2626' : '#94a3b8',
+              fontWeight: st !== 'pending' ? 600 : 400 }}>
+              {step.label}
+            </div>
+            {st === 'failed' && s[step.key]?.note && (
+              <div style={{ fontSize: 11, color: '#dc2626', marginTop: 2, maxWidth: 120, margin: '2px auto 0' }}>
+                {s[step.key].note}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export default function SmeTabs({ sme, requests, health, packages, appliedIds, myApplications }: { sme: any; requests: any[]; health: any; packages: any[]; appliedIds: string[]; myApplications: any[] }) {
   const [tab, setTab] = useState<'overview' | 'packages' | 'profile'>('overview')
   const status = getStatus(sme)
   const info = STATUS_INFO[status]
@@ -108,49 +148,33 @@ export default function SmeTabs({ sme, requests, health, packages, appliedIds }:
           <div className="grid grid-2">
             <div className="card">
               <h2>คำขอรับการสนับสนุน</h2>
-              {requests.length === 0 ? (
-                <p className="empty">ยังไม่มีคำขอ — เริ่มยื่นคำขอด้านที่ต้องการได้เลย</p>
-              ) : (
-                <table>
-                  <thead>
-                    <tr><th>ด้าน</th><th>สถานะ</th><th>อัปเดตล่าสุด</th></tr>
-                  </thead>
-                  <tbody>
-                    {requests.map(r => (
-                      <>
-                        <tr key={r.id}>
-                          <td>{CATEGORY_LABELS[r.category]}</td>
-                          <td><Badge status={r.status} /></td>
-                          <td>{new Date(r.updated_at).toLocaleDateString('th-TH')}</td>
-                        </tr>
-                        {r.status === 'rejected' && r.reject_note && (
-                          <tr key={r.id + '-note'}>
-                            <td colSpan={3} style={{ padding: 0 }}>
-                              <div style={{
-                                background: '#fee2e2', color: '#991b1b',
-                                padding: '8px 12px', borderRadius: 8,
-                                fontSize: 13, margin: '2px 0 8px',
-                                borderLeft: '3px solid #dc2626',
-                              }}>
-                                <strong>เหตุผลที่ไม่ผ่าน:</strong> {r.reject_note}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+              <p className="empty">เร็ว ๆ นี้</p>
             </div>
             <div className="card">
               <h2>ผลตรวจสุขภาพธุรกิจ (Health Check)</h2>
               {health ? <HealthView h={health} /> : <p className="empty">ยังไม่ได้ทำแบบประเมิน 5 ด้าน</p>}
             </div>
           </div>
+
           <div className="card">
-            <h2>ยื่นคำขอใหม่</h2>
-            <NewRequestForm smeId={sme.id} usedCategories={requests.map(r => r.category)} />
+            <h2>แพ็กเกจที่ฉันสมัคร ({myApplications.length})</h2>
+            {myApplications.length === 0 ? (
+              <p className="empty">ยังไม่ได้สมัครแพ็กเกจ — ไปที่แท็บ "แพ็กเกจสนับสนุน" เพื่อเลือกสมัคร</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {myApplications.map(app => (
+                  <div key={app.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                      <div style={{ fontWeight: 600 }}>{app.packages?.title ?? '—'}</div>
+                      <div style={{ fontSize: 13, color: '#64748b' }}>
+                        {app.packages?.profiles?.agency_name ?? ''}
+                      </div>
+                    </div>
+                    <AppTimeline steps={app.steps} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}
