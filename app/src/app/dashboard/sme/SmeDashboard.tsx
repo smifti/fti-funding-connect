@@ -20,7 +20,6 @@ export default async function SmeDashboard({ userId }: { userId: string }) {
     .select('id, category, status, detail, created_at, updated_at')
     .eq('sme_id', sme.id)
     .order('created_at', { ascending: false })
-
   // ดึงประวัติสถานะทั้งหมดของคำขอเหล่านี้ เพื่อหาเหตุผลล่าสุดตอน "ไม่ผ่าน"
   const reqIds = (requests ?? []).map(r => r.id)
   let notesByReq: Record<string, string> = {}
@@ -43,14 +42,12 @@ export default async function SmeDashboard({ userId }: { userId: string }) {
     ...r,
     reject_note: notesByReq[r.id] ?? null,
   }))
-
   const { data: health } = await supabase
     .from('health_checks')
     .select('*')
     .eq('sme_id', sme.id)
     .order('created_at', { ascending: false })
     .maybeSingle()
-
   // แพ็กเกจที่อนุมัติแล้ว + เปิดอยู่ (RLS กรองให้เห็นเฉพาะที่ approved+active)
   const { data: packages } = await supabase
     .from('packages')
@@ -58,14 +55,13 @@ export default async function SmeDashboard({ userId }: { userId: string }) {
     .eq('approval_status', 'approved')
     .eq('is_active', true)
     .order('created_at', { ascending: false })
-
-  // แพ็กเกจที่ SME นี้สมัครไปแล้ว
+  // แพ็กเกจที่ SME นี้สมัครไปแล้ว (พร้อม timeline)
   const { data: apps } = await supabase
     .from('package_applications')
-    .select('package_id')
+    .select('id, package_id, status, steps, created_at, packages(title, category, image_url, profiles(agency_name))')
     .eq('sme_id', sme.id)
-  const appliedIds = (apps ?? []).map(a => a.package_id)
-
+    .order('created_at', { ascending: false })
+  const appliedIds = (apps ?? []).map((a: any) => a.package_id).filter(Boolean)
   return (
     <SmeTabs
       sme={sme}
@@ -73,6 +69,7 @@ export default async function SmeDashboard({ userId }: { userId: string }) {
       health={health}
       packages={packages ?? []}
       appliedIds={appliedIds}
+      myApplications={apps ?? []}
     />
   )
 }
