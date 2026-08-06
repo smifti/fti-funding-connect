@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import AgencyAction from './AgencyAction'
+import AgencyAction from './AgencyAction'
+import AgencyPackages from './AgencyPackages'
 
 const CATEGORY_LABELS: Record<string, string> = {
   credit: 'สินเชื่อ', innovation: 'นวัตกรรม', management: 'บริหารจัดการ',
@@ -29,13 +31,14 @@ type Profile = {
 }
 
 export default function AgencyTabs({
-  profile, requests, smeList,
+  profile, requests, smeList, packages,
 }: {
   profile: Profile
   requests: any[]
   smeList: any[]
+  packages: any[]
 }) {
-  const [tab, setTab] = useState<'overview' | 'profile' | 'sme'>('overview')
+  const [tab, setTab] = useState<'overview' | 'packages' | 'profile' | 'sme'>('overview')
   const cats = (profile.agency_categories ?? []) as string[]
 
   const tabStyle = (active: boolean) => ({
@@ -56,6 +59,9 @@ export default function AgencyTabs({
       <div style={{ display: 'flex', gap: 16, marginBottom: 20, borderBottom: '1px solid #e2e8f0' }}>
         <button onClick={() => setTab('overview')} style={tabStyle(tab === 'overview')}>
           คำขอที่ส่งต่อมา
+        </button>
+        <button onClick={() => setTab('packages')} style={tabStyle(tab === 'packages')}>
+          แพ็กเกจของฉัน ({packages.length})
         </button>
         <button onClick={() => setTab('sme')} style={tabStyle(tab === 'sme')}>
           รายชื่อ SME ({smeList.length})
@@ -119,6 +125,14 @@ export default function AgencyTabs({
             </table>
           )}
         </div>
+      )}
+
+     {tab === 'packages' && (
+        <AgencyPackages
+          ownerId={profile.id}
+          categories={(profile.agency_categories ?? []) as string[]}
+          initial={packages}
+        />
       )}
 
       {tab === 'profile' && <AgencyProfileForm profile={profile} />}
