@@ -8,25 +8,31 @@ export default async function AgencyDashboard({ userId }: { userId: string }) {
     .eq('id', userId)
     .single()
 
-  // คำขอที่ส่งต่อมา (forwarded) — RLS จำกัดเฉพาะด้านของ agency อยู่แล้ว
   const { data: requests } = await supabase
     .from('funding_requests')
     .select('id, category, status, detail, created_at, sme_profiles(company_name, province, sme_one_id)')
     .eq('status', 'forwarded')
     .order('created_at', { ascending: true })
 
-  // รายชื่อ SME ที่เกี่ยวข้อง — RLS (agency_can_see_sme) จำกัดเฉพาะ SME ที่ยื่นคำขอด้านของ agency
-const { data: smeList } = await supabase
+  const { data: smeList } = await supabase
     .from('sme_profiles')
     .select('id, company_name, province, sme_one_id, business_type')
     .neq('owner_id', userId)
     .order('company_name', { ascending: true })
+
+  // แพ็กเกจของ agency นี้
+  const { data: packages } = await supabase
+    .from('packages')
+    .select('id, category, title, description, price_amount, price_note, approval_status, is_active')
+    .eq('owner_id', userId)
+    .order('created_at', { ascending: false })
 
   return (
     <AgencyTabs
       profile={profile!}
       requests={requests ?? []}
       smeList={smeList ?? []}
+      packages={packages ?? []}
     />
   )
 }
