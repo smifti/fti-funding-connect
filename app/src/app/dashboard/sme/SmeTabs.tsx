@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import NewRequestForm from './NewRequestForm'
 import ProfileForm from './ProfileForm'
+import SmePackages from './SmePackages'
 
 const CATEGORY_LABELS: Record<string, string> = {
   credit: 'สินเชื่อ',
@@ -53,8 +54,8 @@ const STATUS_INFO = {
   red: { color: '#dc2626', bg: '#fee2e2', label: 'ข้อมูลจำเป็นยังไม่ครบ' },
 }
 
-export default function SmeTabs({ sme, requests, health }: { sme: any; requests: any[]; health: any }) {
-  const [tab, setTab] = useState<'overview' | 'profile'>('overview')
+export default function SmeTabs({ sme, requests, health, packages, appliedIds }: { sme: any; requests: any[]; health: any; packages: any[]; appliedIds: string[] }) {
+  const [tab, setTab] = useState<'overview' | 'packages' | 'profile'>('overview')
   const status = getStatus(sme)
   const info = STATUS_INFO[status]
 
