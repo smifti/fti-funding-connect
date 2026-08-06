@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import AgencyAction from './AgencyAction'
-import AgencyAction from './AgencyAction'
 import AgencyPackages from './AgencyPackages'
 
 const CATEGORY_LABELS: Record<string, string> = {
