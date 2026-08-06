@@ -15,6 +15,13 @@ const PROVINCES = [
   'หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี',
 ]
 
+const BUSINESS_TYPES = [
+  'การผลิต / อุตสาหกรรม','การเกษตร / แปรรูปเกษตร','อาหารและเครื่องดื่ม','ค้าส่ง / ค้าปลีก',
+  'บริการ','ท่องเที่ยว / โรงแรม','ก่อสร้าง / อสังหาริมทรัพย์','โลจิสติกส์ / ขนส่ง',
+  'เทคโนโลยี / ซอฟต์แวร์','สุขภาพ / ความงาม','แฟชั่น / สิ่งทอ','หัตถกรรม / ของที่ระลึก',
+  'พลังงาน / สิ่งแวดล้อม',
+]
+
 const FIELD_LABELS: Record<string, string> = {
   sme_one_id: 'เลขนิติบุคคล / เลขผู้เสียภาษี',
   company_name: 'ชื่อบริษัท / กิจการ',
@@ -47,6 +54,7 @@ const FIELD_LABELS: Record<string, string> = {
   coordinator_relation: 'ความสัมพันธ์กับกิจการ',
 }
 const REQUIRED = new Set(['sme_one_id','company_name','province','business_type','coordinator_name','coordinator_phone','coordinator_email'])
+const SHORT = new Set(['postal_code','year_started','employee_count','fti_member_id','coordinator_phone','coordinator_line'])
 const ALL_KEYS = Object.keys(FIELD_LABELS)
 
 const STEPS = [
@@ -65,12 +73,21 @@ export default function ProfileForm({ sme }: { sme: any }) {
     ALL_KEYS.forEach(k => { init[k] = sme[k] ?? '' })
     return init
   })
+  const [btOther, setBtOther] = useState<boolean>(
+    !!sme.business_type && !BUSINESS_TYPES.includes(sme.business_type)
+  )
   const [msg, setMsg] = useState('')
   const [saving, setSaving] = useState(false)
 
   const set = (k: string) => (e: any) => setForm({ ...form, [k]: e.target.value })
   const current = STEPS[step]
   const isLast = step === STEPS.length - 1
+
+  function onBusinessTypeSelect(e: any) {
+    const v = e.target.value
+    if (v === '__other__') { setBtOther(true); setForm({ ...form, business_type: '' }) }
+    else { setBtOther(false); setForm({ ...form, business_type: v }) }
+  }
 
   async function save() {
     setSaving(true); setMsg('')
@@ -83,20 +100,67 @@ export default function ProfileForm({ sme }: { sme: any }) {
     router.refresh()
   }
 
+  function renderField(key: string) {
+    const label = (
+      <label>
+        {FIELD_LABELS[key]}
+        {REQUIRED.has(key) && <span style={{ color: '#dc2626' }}> *</span>}
+      </label>
+    )
+
+    if (key === 'province') {
+      return (
+        <div className="field" key={key}>
+          {label}
+          <select value={form[key]} onChange={set(key)}>
+            <option value="">— เลือกจังหวัด —</option>
+            {PROVINCES.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </div>
+      )
+    }
+
+    if (key === 'business_type') {
+      return (
+        <div className="field" key={key}>
+          {label}
+          <select value={btOther ? '__other__' : form.business_type} onChange={onBusinessTypeSelect}>
+            <option value="">— เลือกประเภทธุรกิจ —</option>
+            {BUSINESS_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
+            <option value="__other__">อื่นๆ (ระบุเอง)</option>
+          </select>
+          {btOther && (
+            <input style={{ marginTop: 8 }} placeholder="ระบุประเภทธุรกิจ"
+              value={form.business_type} onChange={set('business_type')} />
+          )}
+        </div>
+      )
+    }
+
+    if (SHORT.has(key)) {
+      return (
+        <div className="field" key={key}>
+          {label}
+          <input style={{ maxWidth: 220 }} value={form[key]} onChange={set(key)} />
+        </div>
+      )
+    }
+
+    return (
+      <div className="field" key={key}>
+        {label}
+        <input value={form[key]} onChange={set(key)} />
+      </div>
+    )
+  }
+
   return (
     <div className="card">
       <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
         {STEPS.map((s, i) => (
           <div key={s.title} onClick={() => setStep(i)} style={{ flex: 1, cursor: 'pointer' }}>
-            <div style={{
-              height: 4, borderRadius: 2, marginBottom: 6,
-              background: i <= step ? '#1e3a8a' : '#e2e8f0',
-            }} />
-            <div style={{
-              fontSize: 12, textAlign: 'center',
-              color: i === step ? '#1e3a8a' : '#94a3b8',
-              fontWeight: i === step ? 600 : 400,
-            }}>
+            <div style={{ height: 4, borderRadius: 2, marginBottom: 6, background: i <= step ? '#1e3a8a' : '#e2e8f0' }} />
+            <div style={{ fontSize: 12, textAlign: 'center', color: i === step ? '#1e3a8a' : '#94a3b8', fontWeight: i === step ? 600 : 400 }}>
               {i + 1}. {s.title}
             </div>
           </div>
@@ -105,45 +169,20 @@ export default function ProfileForm({ sme }: { sme: any }) {
 
       {msg && <div className={`alert ${msg.includes('เรียบร้อย') ? 'alert-ok' : 'alert-err'}`}>{msg}</div>}
 
-      <div style={{ fontWeight: 600, fontSize: 16, margin: '0 0 14px', color: '#1e3a8a' }}>
-        {current.title}
-      </div>
+      <div style={{ fontWeight: 600, fontSize: 16, margin: '0 0 14px', color: '#1e3a8a' }}>{current.title}</div>
 
-      {current.keys.map(key => (
-        <div className="field" key={key}>
-          <label>
-            {FIELD_LABELS[key]}
-            {REQUIRED.has(key) && <span style={{ color: '#dc2626' }}> *</span>}
-          </label>
-          {key === 'province' ? (
-            <select value={form[key]} onChange={set(key)}>
-              <option value="">— เลือกจังหวัด —</option>
-              {PROVINCES.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-          ) : (
-            <input value={form[key]} onChange={set(key)} />
-          )}
-        </div>
-      ))}
+      {current.keys.map(key => renderField(key))}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20, gap: 10 }}>
-        <button
-          className="btn btn-ghost"
-          onClick={() => setStep(step - 1)}
-          disabled={step === 0}
-          style={{ visibility: step === 0 ? 'hidden' : 'visible' }}
-        >
+        <button className="btn btn-ghost" onClick={() => setStep(step - 1)} disabled={step === 0}
+          style={{ visibility: step === 0 ? 'hidden' : 'visible' }}>
           ← ย้อนกลับ
         </button>
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-ghost" onClick={save} disabled={saving}>
             {saving ? 'กำลังบันทึก…' : 'บันทึก'}
           </button>
-          {!isLast && (
-            <button className="btn" onClick={() => setStep(step + 1)}>
-              ถัดไป →
-            </button>
-          )}
+          {!isLast && <button className="btn" onClick={() => setStep(step + 1)}>ถัดไป →</button>}
         </div>
       </div>
     </div>
