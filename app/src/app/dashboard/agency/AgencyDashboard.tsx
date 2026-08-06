@@ -20,11 +20,17 @@ export default async function AgencyDashboard({ userId }: { userId: string }) {
     .neq('owner_id', userId)
     .order('company_name', { ascending: true })
 
-  // แพ็กเกจของ agency นี้
-const { data: packages } = await supabase
+ // แพ็กเกจของ agency นี้
+  const { data: packages } = await supabase
     .from('packages')
     .select('id, template_type, category, title, description, price_amount, price_note, funding_type, support_items, target_sme, target_industry, open_period, image_url, approval_status, is_active')
     .eq('owner_id', userId)
+    .order('created_at', { ascending: false })
+
+  // ผู้สมัครแพ็กเกจของ agency นี้ (RLS กรองให้เห็นเฉพาะใบสมัครของแพ็กเกจตัวเอง)
+  const { data: applicants } = await supabase
+    .from('package_applications')
+    .select('id, status, status_note, created_at, packages(title, category), sme_profiles(company_name, province, sme_one_id)')
     .order('created_at', { ascending: false })
 
   return (
@@ -33,6 +39,7 @@ const { data: packages } = await supabase
       requests={requests ?? []}
       smeList={smeList ?? []}
       packages={packages ?? []}
+      applicants={applicants ?? []}
     />
   )
 }
