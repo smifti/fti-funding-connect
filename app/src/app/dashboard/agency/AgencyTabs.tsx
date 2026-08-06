@@ -2,8 +2,20 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
-import { CATEGORY_LABELS, Badge } from '@/components/shared'
 import AgencyAction from './AgencyAction'
+
+const CATEGORY_LABELS: Record<string, string> = {
+  credit: 'สินเชื่อ', innovation: 'นวัตกรรม', management: 'บริหารจัดการ',
+  marketing: 'การตลาด', production: 'การผลิต', upskill: 'Upskill / Reskill',
+  other: 'อื่น ๆ (ESG)',
+}
+const STATUS_LABELS: Record<string, string> = {
+  submitted: 'ยื่นแล้ว', screening: 'กำลังคัดกรอง', forwarded: 'ส่งต่อหน่วยงาน',
+  in_review: 'หน่วยงานพิจารณา', approved: 'สำเร็จ', rejected: 'ไม่ผ่าน',
+}
+function Badge({ status }: { status: string }) {
+  return <span className={`badge b-${status}`}>{STATUS_LABELS[status] ?? status}</span>
+}
 
 type Profile = {
   id: string
@@ -161,8 +173,7 @@ function AgencyProfileForm({ profile }: { profile: Profile }) {
     <div className="card" style={{ maxWidth: 640 }}>
       <h2>ข้อมูลหน่วยงาน</h2>
       {msg && (
-        <div className={msg.startsWith('บันทึก') ? 'alert' : 'alert alert-err'}
-          style={{ background: msg.startsWith('บันทึก') ? '#dcfce7' : '#fee2e2',
+        <div style={{ background: msg.startsWith('บันทึก') ? '#dcfce7' : '#fee2e2',
                    color: msg.startsWith('บันทึก') ? '#166534' : '#991b1b',
                    padding: '8px 12px', borderRadius: 8, marginBottom: 12, fontSize: 14 }}>
           {msg}
