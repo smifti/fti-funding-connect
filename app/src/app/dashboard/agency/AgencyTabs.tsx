@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import AgencyAction from './AgencyAction'
 import AgencyPackages from './AgencyPackages'
+import AgencyApplicants from './AgencyApplicants'
 
 const CATEGORY_LABELS: Record<string, string> = {
   credit: 'สินเชื่อ', innovation: 'นวัตกรรม', management: 'บริหารจัดการ',
@@ -30,12 +31,13 @@ type Profile = {
 }
 
 export default function AgencyTabs({
-  profile, requests, smeList, packages,
+  profile, requests, smeList, packages, applicants,
 }: {
   profile: Profile
   requests: any[]
   smeList: any[]
   packages: any[]
+  applicants: any[]
 }) {
   const [tab, setTab] = useState<'overview' | 'packages' | 'profile' | 'sme'>('overview')
   const cats = (profile.agency_categories ?? []) as string[]
@@ -63,7 +65,7 @@ export default function AgencyTabs({
           แพ็กเกจของฉัน ({packages.length})
         </button>
         <button onClick={() => setTab('sme')} style={tabStyle(tab === 'sme')}>
-          รายชื่อ SME ({smeList.length})
+          ผู้สมัครแพ็กเกจ ({applicants.length})
         </button>
         <button onClick={() => setTab('profile')} style={tabStyle(tab === 'profile')}>
           โปรไฟล์หน่วยงาน
@@ -99,34 +101,10 @@ export default function AgencyTabs({
       )}
 
       {tab === 'sme' && (
-        <div className="card">
-          <h2>รายชื่อ SME ที่เกี่ยวข้อง ({smeList.length})</h2>
-          <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: -4, marginBottom: 12 }}>
-            แสดงเฉพาะ SME ที่ยื่นคำขอในด้านที่หน่วยงานของท่านรับผิดชอบ
-          </p>
-          {smeList.length === 0 ? (
-            <p className="empty">ยังไม่มี SME ที่ยื่นคำขอด้านของท่าน</p>
-          ) : (
-            <table>
-              <thead>
-                <tr><th>กิจการ</th><th>SME ONE ID</th><th>จังหวัด</th><th>ประเภทธุรกิจ</th></tr>
-              </thead>
-              <tbody>
-                {smeList.map((s: any) => (
-                  <tr key={s.id}>
-                    <td>{s.company_name ?? '—'}</td>
-                    <td>{s.sme_one_id ?? '—'}</td>
-                    <td>{s.province ?? '—'}</td>
-                    <td>{s.business_type ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <AgencyApplicants initial={applicants} />
       )}
 
-     {tab === 'packages' && (
+      {tab === 'packages' && (
         <AgencyPackages
           ownerId={profile.id}
           categories={(profile.agency_categories ?? []) as string[]}
