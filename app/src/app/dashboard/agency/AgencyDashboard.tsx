@@ -16,9 +16,10 @@ export default async function AgencyDashboard({ userId }: { userId: string }) {
     .order('created_at', { ascending: true })
 
   // รายชื่อ SME ที่เกี่ยวข้อง — RLS (agency_can_see_sme) จำกัดเฉพาะ SME ที่ยื่นคำขอด้านของ agency
-  const { data: smeList } = await supabase
+const { data: smeList } = await supabase
     .from('sme_profiles')
     .select('id, company_name, province, sme_one_id, business_type')
+    .neq('owner_id', userId)
     .order('company_name', { ascending: true })
 
   return (
