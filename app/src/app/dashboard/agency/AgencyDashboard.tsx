@@ -21,9 +21,9 @@ export default async function AgencyDashboard({ userId }: { userId: string }) {
     .order('company_name', { ascending: true })
 
   // แพ็กเกจของ agency นี้
-  const { data: packages } = await supabase
+const { data: packages } = await supabase
     .from('packages')
-    .select('id, category, title, description, price_amount, price_note, approval_status, is_active')
+    .select('id, template_type, category, title, description, price_amount, price_note, funding_type, support_items, target_sme, target_industry, open_period, image_url, approval_status, is_active')
     .eq('owner_id', userId)
     .order('created_at', { ascending: false })
 
