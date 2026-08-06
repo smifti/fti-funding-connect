@@ -59,6 +59,12 @@ export function TopBar({ role }: { role: string }) {
               </a>
             </>
           )}
+          {(role === 'admin' || role === 'expert') && (
+            <a href="/dashboard/package-approvals" className="btn btn-ghost btn-sm"
+              style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
+              อนุมัติแพ็กเกจ
+            </a>
+          )}
           <form action={signOut}>
             <button className="btn btn-ghost btn-sm" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
               ออกจากระบบ
