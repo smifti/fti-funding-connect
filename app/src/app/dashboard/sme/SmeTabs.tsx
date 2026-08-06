@@ -76,6 +76,15 @@ export default function SmeTabs({ sme, requests, health, packages, appliedIds }:
           }}>
           ภาพรวม
         </button>
+        <button onClick={() => setTab('packages')}
+          style={{
+            border: 'none', background: 'none', cursor: 'pointer', padding: '10px 4px', fontSize: 15,
+            fontWeight: tab === 'packages' ? 600 : 400,
+            color: tab === 'packages' ? '#1e3a8a' : '#64748b',
+            borderBottom: tab === 'packages' ? '2px solid #1e3a8a' : '2px solid transparent',
+          }}>
+          แพ็กเกจสนับสนุน ({packages.length})
+        </button>
         <button onClick={() => setTab('profile')}
           style={{
             border: 'none', background: 'none', cursor: 'pointer', padding: '10px 4px', fontSize: 15,
@@ -144,6 +153,10 @@ export default function SmeTabs({ sme, requests, health, packages, appliedIds }:
             <NewRequestForm smeId={sme.id} usedCategories={requests.map(r => r.category)} />
           </div>
         </>
+      )}
+
+      {tab === 'packages' && (
+        <SmePackages smeId={sme.id} packages={packages} appliedIds={appliedIds} />
       )}
 
       {tab === 'profile' && (
