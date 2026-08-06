@@ -55,6 +55,9 @@ export default function AgencyApplicants({ initial }: { initial: App[] }) {
   return (
     <div className="card">
       <h2>ผู้สมัครแพ็กเกจ ({initial.length})</h2>
+      <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: -4, marginBottom: 12 }}>
+        กดที่หมุดใดก็ได้เพื่อเปลี่ยนสถานะ (เดินหน้าหรือย้อนกลับได้)
+      </p>
       {msg && (
         <div style={{ background: '#fee2e2', color: '#991b1b', padding: '8px 12px',
           borderRadius: 8, margin: '12px 0', fontSize: 14 }}>{msg}</div>
@@ -80,20 +83,27 @@ export default function AgencyApplicants({ initial }: { initial: App[] }) {
               </div>
 
               {rejected ? (
-                <div style={{ background: '#fee2e2', color: '#991b1b', padding: '10px 14px', borderRadius: 8, fontSize: 14 }}>
-                  <strong>ไม่ผ่าน</strong>
-                  {a.status_note && <div style={{ marginTop: 4, fontSize: 13 }}>เหตุผล: {a.status_note}</div>}
+                <div>
+                  <div style={{ background: '#fee2e2', color: '#991b1b', padding: '10px 14px', borderRadius: 8, fontSize: 14 }}>
+                    <strong>ไม่ผ่าน</strong>
+                    {a.status_note && <div style={{ marginTop: 4, fontSize: 13 }}>เหตุผล: {a.status_note}</div>}
+                  </div>
+                  <div style={{ marginTop: 12, textAlign: 'right' }}>
+                    <button className="btn btn-ghost btn-sm" disabled={busy === a.id}
+                      onClick={() => moveTo(a.id, 'submitted', null)}>
+                      กลับมาพิจารณาใหม่
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <>
-                  {/* Timeline หมุดแนวนอน */}
+                  {/* Timeline หมุดแนวนอน — กดได้ทุกหมุด */}
                   <div style={{ display: 'flex', alignItems: 'flex-start', position: 'relative' }}>
                     {STEPS.map((step, i) => {
                       const done = i < curIdx
                       const current = i === curIdx
-                      const isNext = i === curIdx + 1
-                      const clickable = isNext && busy !== a.id
-                      const dotColor = done || current ? '#16a34a' : (isNext ? '#1e3a8a' : '#cbd5e1')
+                      const clickable = !current && busy !== a.id
+                      const dotColor = done || current ? '#16a34a' : '#94a3b8'
                       return (
                         <div key={step.key} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
                           {/* เส้นเชื่อมซ้าย */}
@@ -105,7 +115,7 @@ export default function AgencyApplicants({ initial }: { initial: App[] }) {
                           <button
                             disabled={!clickable}
                             onClick={() => clickable && moveTo(a.id, step.key, null)}
-                            title={clickable ? `กดเพื่อเลื่อนไป: ${step.label}` : ''}
+                            title={clickable ? `เปลี่ยนเป็น: ${step.label}` : 'สถานะปัจจุบัน'}
                             style={{
                               position: 'relative', zIndex: 1,
                               width: 28, height: 28, borderRadius: '50%',
@@ -115,13 +125,13 @@ export default function AgencyApplicants({ initial }: { initial: App[] }) {
                               cursor: clickable ? 'pointer' : 'default',
                               fontSize: 13, fontWeight: 600,
                               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                              boxShadow: clickable ? '0 0 0 4px rgba(30,58,138,.12)' : 'none',
+                              boxShadow: current ? '0 0 0 4px rgba(22,163,74,.15)' : 'none',
                             }}>
                             {done ? '✓' : i + 1}
                           </button>
                           <div style={{ fontSize: 12, marginTop: 6,
-                            color: current ? '#16a34a' : (isNext ? '#1e3a8a' : '#94a3b8'),
-                            fontWeight: current || isNext ? 600 : 400 }}>
+                            color: current ? '#16a34a' : '#94a3b8',
+                            fontWeight: current ? 600 : 400 }}>
                             {step.label}
                           </div>
                         </div>
@@ -129,32 +139,30 @@ export default function AgencyApplicants({ initial }: { initial: App[] }) {
                     })}
                   </div>
 
-                  {/* ปุ่มไม่ผ่าน (ถ้ายังไม่เสร็จสิ้น) */}
-                  {a.status !== 'completed' && (
-                    rejectFor === a.id ? (
-                      <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <textarea autoFocus rows={2}
-                          placeholder="เหตุผลที่ไม่ผ่าน (SME จะเห็น)"
-                          value={rejectNote} onChange={e => setRejectNote(e.target.value)}
-                          style={{ width: '100%', fontSize: 13, padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }} />
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button className="btn btn-sm" disabled={busy === a.id || !rejectNote.trim()}
-                            onClick={() => moveTo(a.id, 'rejected', rejectNote.trim())}>
-                            {busy === a.id ? '…' : 'ยืนยันไม่ผ่าน'}
-                          </button>
-                          <button className="btn btn-sm btn-ghost"
-                            onClick={() => { setRejectFor(null); setRejectNote('') }}>ยกเลิก</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ marginTop: 14, textAlign: 'right' }}>
-                        <button className="btn btn-ghost btn-sm" style={{ color: '#dc2626' }}
-                          disabled={busy === a.id}
-                          onClick={() => { setRejectFor(a.id); setRejectNote(''); setMsg('') }}>
-                          ทำเครื่องหมายว่าไม่ผ่าน
+                  {/* ปุ่มไม่ผ่าน */}
+                  {rejectFor === a.id ? (
+                    <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <textarea autoFocus rows={2}
+                        placeholder="เหตุผลที่ไม่ผ่าน (SME จะเห็น)"
+                        value={rejectNote} onChange={e => setRejectNote(e.target.value)}
+                        style={{ width: '100%', fontSize: 13, padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }} />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn-sm" disabled={busy === a.id || !rejectNote.trim()}
+                          onClick={() => moveTo(a.id, 'rejected', rejectNote.trim())}>
+                          {busy === a.id ? '…' : 'ยืนยันไม่ผ่าน'}
                         </button>
+                        <button className="btn btn-sm btn-ghost"
+                          onClick={() => { setRejectFor(null); setRejectNote('') }}>ยกเลิก</button>
                       </div>
-                    )
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 14, textAlign: 'right' }}>
+                      <button className="btn btn-ghost btn-sm" style={{ color: '#dc2626' }}
+                        disabled={busy === a.id}
+                        onClick={() => { setRejectFor(a.id); setRejectNote(''); setMsg('') }}>
+                        ทำเครื่องหมายว่าไม่ผ่าน
+                      </button>
+                    </div>
                   )}
                 </>
               )}
