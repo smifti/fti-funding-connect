@@ -50,11 +50,29 @@ export default async function SmeDashboard({ userId }: { userId: string }) {
     .eq('sme_id', sme.id)
     .order('created_at', { ascending: false })
     .maybeSingle()
+
+  // แพ็กเกจที่อนุมัติแล้ว + เปิดอยู่ (RLS กรองให้เห็นเฉพาะที่ approved+active)
+  const { data: packages } = await supabase
+    .from('packages')
+    .select('id, template_type, category, title, description, price_amount, price_note, funding_type, support_items, target_sme, target_industry, open_period, image_url, profiles(agency_name, agency_email, phone)')
+    .eq('approval_status', 'approved')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+
+  // แพ็กเกจที่ SME นี้สมัครไปแล้ว
+  const { data: apps } = await supabase
+    .from('package_applications')
+    .select('package_id')
+    .eq('sme_id', sme.id)
+  const appliedIds = (apps ?? []).map(a => a.package_id)
+
   return (
     <SmeTabs
       sme={sme}
       requests={requestsWithNote}
       health={health}
+      packages={packages ?? []}
+      appliedIds={appliedIds}
     />
   )
 }
