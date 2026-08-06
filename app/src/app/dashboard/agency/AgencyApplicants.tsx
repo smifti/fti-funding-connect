@@ -3,28 +3,15 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 
-// Timeline 5 สถานะ
-const STATUS_LABELS: Record<string, { text: string; bg: string; color: string }> = {
-  submitted: { text: 'ยื่นสมัคร', bg: '#dbeafe', color: '#1e40af' },
-  screening: { text: 'พิจารณาคุณสมบัติ', bg: '#fef9c3', color: '#a16207' },
-  in_progress: { text: 'อยู่ระหว่างดำเนินการ', bg: '#e0e7ff', color: '#3730a3' },
-  completed: { text: 'ดำเนินการเสร็จสิ้น', bg: '#dcfce7', color: '#166534' },
-  rejected: { text: 'ไม่ผ่าน', bg: '#fee2e2', color: '#991b1b' },
-}
-
-// ปุ่มที่กดได้ในแต่ละสถานะ
-const NEXT_ACTIONS: Record<string, { to: string; label: string; danger?: boolean }[]> = {
-  submitted: [{ to: 'screening', label: 'เริ่มพิจารณาคุณสมบัติ' }],
-  screening: [
-    { to: 'in_progress', label: 'ผ่าน → เริ่มดำเนินการ' },
-    { to: 'rejected', label: 'ไม่ผ่าน', danger: true },
-  ],
-  in_progress: [
-    { to: 'completed', label: 'เสร็จสิ้น' },
-    { to: 'rejected', label: 'ไม่ผ่าน', danger: true },
-  ],
-  completed: [],
-  rejected: [],
+// หมุด timeline (เรียงลำดับ)
+const STEPS = [
+  { key: 'submitted', label: 'ยื่นสมัคร' },
+  { key: 'screening', label: 'พิจารณาคุณสมบัติ' },
+  { key: 'in_progress', label: 'ดำเนินการ' },
+  { key: 'completed', label: 'เสร็จสิ้น' },
+]
+const STEP_INDEX: Record<string, number> = {
+  submitted: 0, screening: 1, in_progress: 2, completed: 3,
 }
 
 type App = {
@@ -41,10 +28,10 @@ export default function AgencyApplicants({ initial }: { initial: App[] }) {
   const supabase = createClient()
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState('')
-  const [noteFor, setNoteFor] = useState<{ id: string; to: string } | null>(null)
-  const [noteText, setNoteText] = useState('')
+  const [rejectFor, setRejectFor] = useState<string | null>(null)
+  const [rejectNote, setRejectNote] = useState('')
 
-  async function doChange(id: string, to: string, note: string | null) {
+  async function moveTo(id: string, to: string, note: string | null) {
     setBusy(id); setMsg('')
     const { error } = await supabase
       .from('package_applications')
@@ -52,13 +39,8 @@ export default function AgencyApplicants({ initial }: { initial: App[] }) {
       .eq('id', id)
     setBusy(null)
     if (error) { setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
-    setNoteFor(null); setNoteText('')
+    setRejectFor(null); setRejectNote('')
     router.refresh()
-  }
-
-  function handleAction(id: string, to: string) {
-    if (to === 'rejected') { setNoteFor({ id, to }); setNoteText(''); setMsg('') ; return }
-    doChange(id, to, null)
   }
 
   if (initial.length === 0) {
@@ -77,72 +59,109 @@ export default function AgencyApplicants({ initial }: { initial: App[] }) {
         <div style={{ background: '#fee2e2', color: '#991b1b', padding: '8px 12px',
           borderRadius: 8, margin: '12px 0', fontSize: 14 }}>{msg}</div>
       )}
-      <table style={{ marginTop: 12 }}>
-        <thead>
-          <tr><th>กิจการ</th><th>แพ็กเกจ</th><th>สถานะ</th><th>การดำเนินการ</th></tr>
-        </thead>
-        <tbody>
-          {initial.map(a => {
-            const st = STATUS_LABELS[a.status] ?? STATUS_LABELS.submitted
-            const actions = NEXT_ACTIONS[a.status] ?? []
-            const isEditingNote = noteFor?.id === a.id
-            return (
-              <tr key={a.id}>
-                <td>
-                  {a.sme_profiles?.company_name ?? '—'}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 12 }}>
+        {initial.map(a => {
+          const rejected = a.status === 'rejected'
+          const curIdx = STEP_INDEX[a.status] ?? 0
+          return (
+            <div key={a.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
+              {/* หัวข้อ: ชื่อกิจการ + แพ็กเกจ */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                <div>
+                  <div style={{ fontWeight: 600 }}>{a.sme_profiles?.company_name ?? '—'}</div>
                   <div style={{ fontSize: 12, color: 'var(--muted)' }}>
                     {a.sme_profiles?.province} {a.sme_profiles?.sme_one_id ? `· ${a.sme_profiles.sme_one_id}` : ''}
                   </div>
-                </td>
-                <td style={{ fontSize: 13 }}>{a.packages?.title ?? '—'}</td>
-                <td>
-                  <span style={{ background: st.bg, color: st.color, fontSize: 12,
-                    padding: '3px 10px', borderRadius: 12, whiteSpace: 'nowrap' }}>
-                    {st.text}
-                  </span>
-                  {a.status === 'rejected' && a.status_note && (
-                    <div style={{ fontSize: 12, color: '#991b1b', marginTop: 4, maxWidth: 200 }}>
-                      เหตุผล: {a.status_note}
-                    </div>
-                  )}
-                </td>
-                <td>
-                  {isEditingNote ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 220 }}>
-                      <textarea autoFocus rows={2}
-                        placeholder="เหตุผลที่ไม่ผ่าน (SME จะเห็น)"
-                        value={noteText} onChange={e => setNoteText(e.target.value)}
-                        style={{ width: '100%', fontSize: 13, padding: 6, borderRadius: 6, border: '1px solid #cbd5e1' }} />
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button className="btn btn-sm" disabled={busy === a.id || !noteText.trim()}
-                          onClick={() => doChange(noteFor!.id, noteFor!.to, noteText.trim())}>
-                          {busy === a.id ? '…' : 'ยืนยันไม่ผ่าน'}
-                        </button>
-                        <button className="btn btn-sm btn-ghost" disabled={busy === a.id}
-                          onClick={() => { setNoteFor(null); setNoteText('') }}>ยกเลิก</button>
+                </div>
+                <div style={{ fontSize: 13, color: '#475569', textAlign: 'right' }}>
+                  แพ็กเกจ: <strong>{a.packages?.title ?? '—'}</strong>
+                </div>
+              </div>
+
+              {rejected ? (
+                <div style={{ background: '#fee2e2', color: '#991b1b', padding: '10px 14px', borderRadius: 8, fontSize: 14 }}>
+                  <strong>ไม่ผ่าน</strong>
+                  {a.status_note && <div style={{ marginTop: 4, fontSize: 13 }}>เหตุผล: {a.status_note}</div>}
+                </div>
+              ) : (
+                <>
+                  {/* Timeline หมุดแนวนอน */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', position: 'relative' }}>
+                    {STEPS.map((step, i) => {
+                      const done = i < curIdx
+                      const current = i === curIdx
+                      const isNext = i === curIdx + 1
+                      const clickable = isNext && busy !== a.id
+                      const dotColor = done || current ? '#16a34a' : (isNext ? '#1e3a8a' : '#cbd5e1')
+                      return (
+                        <div key={step.key} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
+                          {/* เส้นเชื่อมซ้าย */}
+                          {i > 0 && (
+                            <div style={{ position: 'absolute', top: 13, left: '-50%', width: '100%', height: 3,
+                              background: i <= curIdx ? '#16a34a' : '#e2e8f0' }} />
+                          )}
+                          {/* หมุด */}
+                          <button
+                            disabled={!clickable}
+                            onClick={() => clickable && moveTo(a.id, step.key, null)}
+                            title={clickable ? `กดเพื่อเลื่อนไป: ${step.label}` : ''}
+                            style={{
+                              position: 'relative', zIndex: 1,
+                              width: 28, height: 28, borderRadius: '50%',
+                              border: `2px solid ${dotColor}`,
+                              background: done || current ? dotColor : '#fff',
+                              color: done || current ? '#fff' : dotColor,
+                              cursor: clickable ? 'pointer' : 'default',
+                              fontSize: 13, fontWeight: 600,
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                              boxShadow: clickable ? '0 0 0 4px rgba(30,58,138,.12)' : 'none',
+                            }}>
+                            {done ? '✓' : i + 1}
+                          </button>
+                          <div style={{ fontSize: 12, marginTop: 6,
+                            color: current ? '#16a34a' : (isNext ? '#1e3a8a' : '#94a3b8'),
+                            fontWeight: current || isNext ? 600 : 400 }}>
+                            {step.label}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* ปุ่มไม่ผ่าน (ถ้ายังไม่เสร็จสิ้น) */}
+                  {a.status !== 'completed' && (
+                    rejectFor === a.id ? (
+                      <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <textarea autoFocus rows={2}
+                          placeholder="เหตุผลที่ไม่ผ่าน (SME จะเห็น)"
+                          value={rejectNote} onChange={e => setRejectNote(e.target.value)}
+                          style={{ width: '100%', fontSize: 13, padding: 8, borderRadius: 8, border: '1px solid #cbd5e1' }} />
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button className="btn btn-sm" disabled={busy === a.id || !rejectNote.trim()}
+                            onClick={() => moveTo(a.id, 'rejected', rejectNote.trim())}>
+                            {busy === a.id ? '…' : 'ยืนยันไม่ผ่าน'}
+                          </button>
+                          <button className="btn btn-sm btn-ghost"
+                            onClick={() => { setRejectFor(null); setRejectNote('') }}>ยกเลิก</button>
+                        </div>
                       </div>
-                    </div>
-                  ) : actions.length === 0 ? (
-                    <span style={{ fontSize: 13, color: 'var(--muted)' }}>—</span>
-                  ) : (
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {actions.map(act => (
-                        <button key={act.to}
-                          className={`btn btn-sm ${act.danger ? 'btn-ghost' : ''}`}
+                    ) : (
+                      <div style={{ marginTop: 14, textAlign: 'right' }}>
+                        <button className="btn btn-ghost btn-sm" style={{ color: '#dc2626' }}
                           disabled={busy === a.id}
-                          onClick={() => handleAction(a.id, act.to)}
-                          style={act.danger ? { color: '#dc2626' } : {}}>
-                          {busy === a.id ? '…' : act.label}
+                          onClick={() => { setRejectFor(a.id); setRejectNote(''); setMsg('') }}>
+                          ทำเครื่องหมายว่าไม่ผ่าน
                         </button>
-                      ))}
-                    </div>
+                      </div>
+                    )
                   )}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                </>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
