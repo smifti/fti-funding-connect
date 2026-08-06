@@ -107,11 +107,27 @@ export default function SmeTabs({ sme, requests, health }: { sme: any; requests:
                   </thead>
                   <tbody>
                     {requests.map(r => (
-                      <tr key={r.id}>
-                        <td>{CATEGORY_LABELS[r.category]}</td>
-                        <td><Badge status={r.status} /></td>
-                        <td>{new Date(r.updated_at).toLocaleDateString('th-TH')}</td>
-                      </tr>
+                      <>
+                        <tr key={r.id}>
+                          <td>{CATEGORY_LABELS[r.category]}</td>
+                          <td><Badge status={r.status} /></td>
+                          <td>{new Date(r.updated_at).toLocaleDateString('th-TH')}</td>
+                        </tr>
+                        {r.status === 'rejected' && r.reject_note && (
+                          <tr key={r.id + '-note'}>
+                            <td colSpan={3} style={{ padding: 0 }}>
+                              <div style={{
+                                background: '#fee2e2', color: '#991b1b',
+                                padding: '8px 12px', borderRadius: 8,
+                                fontSize: 13, margin: '2px 0 8px',
+                                borderLeft: '3px solid #dc2626',
+                              }}>
+                                <strong>เหตุผลที่ไม่ผ่าน:</strong> {r.reject_note}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     ))}
                   </tbody>
                 </table>
