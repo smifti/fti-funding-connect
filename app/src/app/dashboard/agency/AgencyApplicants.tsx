@@ -9,8 +9,26 @@ const STEPS = [
   { key: 'in_progress', label: 'ดำเนินการ' },
   { key: 'completed', label: 'เสร็จสิ้น' },
 ]
+const STEP_LABEL: Record<string, string> = {
+  submitted: 'ยื่นสมัคร', screening: 'พิจารณาคุณสมบัติ', in_progress: 'ดำเนินการ', completed: 'เสร็จสิ้น',
+}
+const STATE_LABEL: Record<string, string> = {
+  passed: 'ผ่าน', failed: 'ไม่ผ่าน', pending: 'กลับเป็นรอ',
+}
+const ROLE_LABEL: Record<string, string> = {
+  agency: 'หน่วยงาน', expert: 'ที่ปรึกษา', admin: 'ผู้ดูแลระบบ',
+}
 
 type StepState = { state: 'pending' | 'passed' | 'failed'; note?: string }
+type LogRow = {
+  id: string
+  step_key: string
+  new_state: string
+  note: string | null
+  changed_by_name: string | null
+  changed_by_role: string | null
+  created_at: string
+}
 type App = {
   id: string
   status: string
@@ -18,24 +36,29 @@ type App = {
   created_at: string
   packages: { title: string; category: string } | null
   sme_profiles: { company_name: string | null; province: string | null; sme_one_id: string | null } | null
+  application_logs?: LogRow[]
 }
 
 const STATE_COLOR = {
-  pending: { border: '#cbd5e1', bg: '#fff', fg: '#94a3b8', line: '#e2e8f0' },
-  passed: { border: '#16a34a', bg: '#16a34a', fg: '#fff', line: '#16a34a' },
-  failed: { border: '#dc2626', bg: '#dc2626', fg: '#fff', line: '#dc2626' },
+  pending: { border: '#cbd5e1', bg: '#fff', fg: '#94a3b8' },
+  passed: { border: '#16a34a', bg: '#16a34a', fg: '#fff' },
+  failed: { border: '#dc2626', bg: '#dc2626', fg: '#fff' },
 }
 
-export default function AgencyApplicants({ initial }: { initial: App[] }) {
+export default function AgencyApplicants({
+  initial, currentUser,
+}: {
+  initial: App[]
+  currentUser: { id: string; name: string; role: string }
+}) {
   const router = useRouter()
   const supabase = createClient()
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState('')
-  // เปิดเมนูจัดการหมุด: { appId, stepKey }
   const [editing, setEditing] = useState<{ appId: string; stepKey: string } | null>(null)
   const [failNote, setFailNote] = useState('')
+  const [showLog, setShowLog] = useState<string | null>(null)
 
-  // คำนวณสถานะรวมของใบสมัคร จาก steps
   function overallStatus(steps: Record<string, StepState>): string {
     if (Object.values(steps).some(s => s.state === 'failed')) return 'rejected'
     if (steps.completed?.state === 'passed') return 'completed'
@@ -45,6 +68,7 @@ export default function AgencyApplicants({ initial }: { initial: App[] }) {
   async function setStep(app: App, stepKey: string, state: StepState['state'], note: string | null) {
     setBusy(app.id); setMsg('')
     const newSteps = { ...app.steps, [stepKey]: { state, ...(note ? { note } : {}) } }
+    // 1) อัปเดตสถานะใบสมัคร
     const { error } = await supabase
       .from('package_applications')
       .update({
@@ -53,13 +77,22 @@ export default function AgencyApplicants({ initial }: { initial: App[] }) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', app.id)
+    if (error) { setBusy(null); setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
+    // 2) บันทึก log ว่าใครแก้
+    await supabase.from('application_logs').insert({
+      application_id: app.id,
+      step_key: stepKey,
+      new_state: state,
+      note: note,
+      changed_by: currentUser.id,
+      changed_by_name: currentUser.name,
+      changed_by_role: currentUser.role,
+    })
     setBusy(null)
-    if (error) { setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
     setEditing(null); setFailNote('')
     router.refresh()
   }
 
-  // หมุดนี้เปิดให้แก้ได้ไหม (หมุดก่อนหน้าต้องผ่านก่อน)
   function isStepOpen(steps: Record<string, StepState>, idx: number): boolean {
     if (idx === 0) return true
     const prevKey = STEPS[idx - 1].key
@@ -70,7 +103,7 @@ export default function AgencyApplicants({ initial }: { initial: App[] }) {
     return (
       <div className="card">
         <h2>ผู้สมัครแพ็กเกจ</h2>
-        <p className="empty">ยังไม่มี SME สมัครแพ็กเกจของท่าน</p>
+        <p className="empty">ยังไม่มี SME สมัครแพ็กเกจ</p>
       </div>
     )
   }
@@ -89,6 +122,7 @@ export default function AgencyApplicants({ initial }: { initial: App[] }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 12 }}>
         {initial.map(a => {
           const steps = a.steps ?? {}
+          const logs = a.application_logs ?? []
           return (
             <div key={a.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
@@ -146,7 +180,7 @@ export default function AgencyApplicants({ initial }: { initial: App[] }) {
                 })}
               </div>
 
-              {/* เมนูจัดการหมุด (เปิดเมื่อคลิกหมุด) */}
+              {/* เมนูจัดการหมุด */}
               {editing?.appId === a.id && (
                 <div style={{ marginTop: 16, background: '#f8fafc', border: '1px solid #e2e8f0',
                   borderRadius: 8, padding: 12 }}>
@@ -177,6 +211,35 @@ export default function AgencyApplicants({ initial }: { initial: App[] }) {
                         onClick={() => { setEditing(null); setFailNote('') }}>ปิด</button>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* ประวัติการแก้ไข */}
+              {logs.length > 0 && (
+                <div style={{ marginTop: 14, borderTop: '1px solid #f1f5f9', paddingTop: 10 }}>
+                  <button
+                    onClick={() => setShowLog(showLog === a.id ? null : a.id)}
+                    style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#1e3a8a',
+                      fontSize: 13, padding: 0 }}>
+                    {showLog === a.id ? '▼' : '▶'} ประวัติการปรับปรุง ({logs.length})
+                  </button>
+                  {showLog === a.id && (
+                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {logs.map(log => (
+                        <div key={log.id} style={{ fontSize: 12, color: '#475569',
+                          background: '#f8fafc', borderRadius: 6, padding: '6px 10px' }}>
+                          <strong>{log.changed_by_name ?? '—'}</strong>
+                          <span style={{ color: '#94a3b8' }}> ({ROLE_LABEL[log.changed_by_role ?? ''] ?? log.changed_by_role})</span>
+                          {' '}กำหนด <strong>{STEP_LABEL[log.step_key] ?? log.step_key}</strong>
+                          {' '}เป็น <strong>{STATE_LABEL[log.new_state] ?? log.new_state}</strong>
+                          {log.note && <span style={{ color: '#991b1b' }}> — {log.note}</span>}
+                          <div style={{ color: '#94a3b8', marginTop: 2 }}>
+                            {new Date(log.created_at).toLocaleString('th-TH')}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
