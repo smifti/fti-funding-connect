@@ -27,19 +27,27 @@ export default async function AgencyDashboard({ userId }: { userId: string }) {
     .eq('owner_id', userId)
     .order('created_at', { ascending: false })
 
-  // ผู้สมัครแพ็กเกจของ agency นี้ (RLS กรองให้เห็นเฉพาะใบสมัครของแพ็กเกจตัวเอง)
-const { data: applicants } = await supabase
+// ผู้สมัครแพ็กเกจของ agency นี้ (RLS กรองให้เห็นเฉพาะใบสมัครของแพ็กเกจตัวเอง)
+  const { data: applicants } = await supabase
     .from('package_applications')
-    .select('id, status, steps, created_at, packages(title, category), sme_profiles(company_name, province, sme_one_id)')
+    .select('id, status, steps, created_at, packages(title, category), sme_profiles(company_name, province, sme_one_id), application_logs(id, step_key, new_state, note, changed_by_name, changed_by_role, created_at)')
     .order('created_at', { ascending: false })
 
-  return (
+  // ข้อมูลผู้ใช้ปัจจุบัน (ไว้บันทึก log)
+  const currentUser = {
+    id: userId,
+    name: profile?.agency_name || profile?.full_name || '—',
+    role: 'agency',
+  }
+
+return (
     <AgencyTabs
       profile={profile!}
       requests={requests ?? []}
       smeList={smeList ?? []}
       packages={packages ?? []}
       applicants={applicants ?? []}
+      currentUser={currentUser}
     />
   )
 }
