@@ -51,15 +51,17 @@ const EMPTY_FORM = {
 }
 
 export default function AgencyPackages({
-  ownerId, categories, initial,
+  ownerId, categories, initial, applicantCounts,
 }: {
   ownerId: string
   categories: string[]
   initial: Pkg[]
+  applicantCounts: Record<string, number>
 }) {
   const router = useRouter()
   const supabase = createClient()
   const [showForm, setShowForm] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)   // แพ็กเกจที่กำลังแก้ (null = สร้างใหม่)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -67,12 +69,53 @@ export default function AgencyPackages({
 
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
 
-  async function create() {
+  function resetForm() {
+    setForm({ ...EMPTY_FORM, category: categories[0] ?? 'credit' })
+    setImageFile(null)
+    setEditId(null)
+  }
+
+  function openCreate() {
+    resetForm()
+    setShowForm(true)
+    setMsg('')
+  }
+
+  function openEdit(p: Pkg) {
+    const count = applicantCounts[p.id] ?? 0
+    if (count > 0) {
+      const ok = confirm(
+        `แพ็กเกจนี้มีผู้สมัครแล้ว ${count} ราย\n\n` +
+        `การแก้ไขจะกระทบข้อมูลที่ผู้สมัครเห็น และแพ็กเกจจะกลับไปสถานะ "รออนุมัติ" ` +
+        `(หายจากหน้า SME ชั่วคราวจนกว่าจะอนุมัติใหม่)\n\nต้องการดำเนินการต่อหรือไม่?`
+      )
+      if (!ok) return
+    }
+    setForm({
+      template_type: p.template_type ?? 'grant',
+      category: p.category ?? 'credit',
+      title: p.title ?? '',
+      description: p.description ?? '',
+      price_amount: p.price_amount != null ? String(p.price_amount) : '',
+      price_note: p.price_note ?? '',
+      funding_type: p.funding_type ?? '',
+      support_items: p.support_items ?? '',
+      target_sme: p.target_sme ?? '',
+      target_industry: p.target_industry ?? '',
+      open_period: p.open_period ?? '',
+    })
+    setImageFile(null)
+    setEditId(p.id)
+    setShowForm(true)
+    setMsg('')
+  }
+
+  async function save() {
     if (!form.title.trim()) { setMsg('กรุณาระบุชื่อแพ็กเกจ'); return }
     setBusy(true); setMsg('')
 
-    // อัปโหลดรูปก่อน (ถ้ามี)
-    let imageUrl: string | null = null
+    // อัปโหลดรูปใหม่ (ถ้าเลือก)
+    let imageUrl: string | null | undefined = undefined
     if (imageFile) {
       const ext = imageFile.name.split('.').pop()
       const path = `${ownerId}/${Date.now()}.${ext}`
@@ -84,8 +127,7 @@ export default function AgencyPackages({
       imageUrl = pub.publicUrl
     }
 
-    const { error } = await supabase.from('packages').insert({
-      owner_id: ownerId,
+    const payload: any = {
       template_type: form.template_type,
       category: form.category,
       title: form.title.trim(),
@@ -97,13 +139,27 @@ export default function AgencyPackages({
       target_sme: form.target_sme.trim() || null,
       target_industry: form.target_industry.trim() || null,
       open_period: form.open_period.trim() || null,
-      image_url: imageUrl,
-    })
+    }
+    if (imageUrl !== undefined) payload.image_url = imageUrl
+
+    let error
+    if (editId) {
+      // แก้ไข → กลับไปรออนุมัติใหม่
+      payload.approval_status = 'pending'
+      const res = await supabase.from('packages').update(payload).eq('id', editId)
+      error = res.error
+    } else {
+      // สร้างใหม่
+      payload.owner_id = ownerId
+      payload.image_url = imageUrl ?? null
+      const res = await supabase.from('packages').insert(payload)
+      error = res.error
+    }
+
     setBusy(false)
     if (error) { setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
     setShowForm(false)
-    setForm({ ...EMPTY_FORM, category: categories[0] ?? 'credit' })
-    setImageFile(null)
+    resetForm()
     router.refresh()
   }
 
@@ -115,7 +171,11 @@ export default function AgencyPackages({
   }
 
   async function remove(id: string) {
-    if (!confirm('ต้องการลบแพ็กเกจนี้ใช่หรือไม่?')) return
+    const count = applicantCounts[id] ?? 0
+    const warn = count > 0
+      ? `แพ็กเกจนี้มีผู้สมัครแล้ว ${count} ราย การลบจะลบใบสมัครทั้งหมดด้วย\n\nยืนยันลบ?`
+      : 'ต้องการลบแพ็กเกจนี้ใช่หรือไม่?'
+    if (!confirm(warn)) return
     setBusy(true)
     await supabase.from('packages').delete().eq('id', id)
     setBusy(false)
@@ -132,7 +192,7 @@ export default function AgencyPackages({
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ margin: 0 }}>แพ็กเกจของฉัน ({initial.length})</h2>
-        <button className="btn btn-sm" onClick={() => { setShowForm(!showForm); setMsg('') }}>
+        <button className="btn btn-sm" onClick={() => showForm ? (setShowForm(false), resetForm()) : openCreate()}>
           {showForm ? 'ปิดฟอร์ม' : '+ สร้างแพ็กเกจใหม่'}
         </button>
       </div>
@@ -145,6 +205,12 @@ export default function AgencyPackages({
       {showForm && (
         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10,
           padding: 16, marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+          {editId && (
+            <div style={{ background: '#fef9c3', color: '#a16207', padding: '8px 12px', borderRadius: 8, fontSize: 13 }}>
+              กำลังแก้ไขแพ็กเกจ — เมื่อบันทึกแล้วจะกลับไปสถานะ "รออนุมัติ"
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 12 }}>
             <div style={{ flex: 1 }}>
@@ -229,15 +295,18 @@ export default function AgencyPackages({
             {imageFile && (
               <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>เลือกแล้ว: {imageFile.name}</div>
             )}
+            {editId && !imageFile && (
+              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>เว้นว่างไว้ = ใช้รูปเดิม</div>
+            )}
           </div>
 
           <div>
-            <button className="btn" disabled={busy} onClick={create}>
-              {busy ? 'กำลังบันทึก…' : 'บันทึกแพ็กเกจ'}
+            <button className="btn" disabled={busy} onClick={save}>
+              {busy ? 'กำลังบันทึก…' : (editId ? 'บันทึกการแก้ไข' : 'บันทึกแพ็กเกจ')}
             </button>
           </div>
           <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>
-            * แพ็กเกจใหม่จะอยู่สถานะ "รออนุมัติ" จนกว่า ส.อ.ท. จะอนุมัติ จึงจะแสดงให้ SME เห็น
+            * แพ็กเกจจะอยู่สถานะ "รออนุมัติ" จนกว่า ส.อ.ท. จะอนุมัติ จึงจะแสดงให้ SME เห็น
           </p>
         </div>
       )}
@@ -247,11 +316,12 @@ export default function AgencyPackages({
       ) : (
         <table style={{ marginTop: 16 }}>
           <thead>
-            <tr><th>แพ็กเกจ</th><th>ประเภท</th><th>ด้าน</th><th>วงเงิน</th><th>สถานะ</th><th>จัดการ</th></tr>
+            <tr><th>แพ็กเกจ</th><th>ประเภท</th><th>ผู้สมัคร</th><th>วงเงิน</th><th>สถานะ</th><th>จัดการ</th></tr>
           </thead>
           <tbody>
             {initial.map(p => {
               const ap = APPROVAL_LABELS[p.approval_status] ?? APPROVAL_LABELS.pending
+              const count = applicantCounts[p.id] ?? 0
               return (
                 <tr key={p.id}>
                   <td>
@@ -261,14 +331,14 @@ export default function AgencyPackages({
                       )}
                       <div>
                         {p.title}
-                        {p.description && (
-                          <div style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 240 }}>{p.description}</div>
-                        )}
+                        <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                          {CATEGORY_LABELS[p.category] ?? p.category} · {TEMPLATE_LABELS[p.template_type] ?? p.template_type}
+                        </div>
                       </div>
                     </div>
                   </td>
                   <td style={{ fontSize: 13 }}>{TEMPLATE_LABELS[p.template_type] ?? p.template_type}</td>
-                  <td>{CATEGORY_LABELS[p.category] ?? p.category}</td>
+                  <td style={{ textAlign: 'center' }}>{count > 0 ? count : '—'}</td>
                   <td>
                     {p.price_amount != null ? p.price_amount.toLocaleString('th-TH') + ' บาท' : '—'}
                     {p.price_note && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{p.price_note}</div>}
@@ -283,7 +353,11 @@ export default function AgencyPackages({
                     )}
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <button className="btn btn-ghost btn-sm" disabled={busy}
+                        onClick={() => openEdit(p)}>
+                        แก้ไข
+                      </button>
                       <button className="btn btn-ghost btn-sm" disabled={busy}
                         onClick={() => toggleActive(p.id, p.is_active)}>
                         {p.is_active ? 'ปิด' : 'เปิด'}
