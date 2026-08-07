@@ -3,9 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
-
 type RoleType = 'sme' | 'agency' | 'expert'
-
 const PROVINCES = [
   'กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา',
   'ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก',
@@ -34,11 +32,19 @@ export default function RegisterPage() {
 
   const set = (k: string) => (e: any) => setForm({ ...form, [k]: e.target.value })
   const roleDesc = roleType === 'sme' ? 'ยื่นคำขอรับการสนับสนุน'
-    : roleType === 'agency' ? 'ธนาคาร, NIA, depa ฯลฯ (รอ ส.อ.ท. อนุมัติ)'
+    : roleType === 'agency' ? 'สถาบันการเงิน, หน่วยงานภาครัฐ, หน่วยร่วมดำเนินการ ฯลฯ (รอ ส.อ.ท. อนุมัติ)'
     : 'คัดกรองคำขอ (รอ ส.อ.ท. อนุมัติ)'
 
   async function onSubmit() {
-    setErr(''); setOk(''); setLoading(true)
+    setErr(''); setOk('')
+
+    // บังคับกรอกเบอร์โทร สำหรับผู้ให้บริการ + ที่ปรึกษา
+    if ((roleType === 'agency' || roleType === 'expert') && form.coordPhone.trim() === '') {
+      setErr('กรุณากรอกเบอร์โทรศัพท์')
+      return
+    }
+
+    setLoading(true)
     const companyName = roleType === 'sme' ? form.companyName : form.orgName
 
     // เช็กเลขนิติบุคคลซ้ำก่อน (เฉพาะ SME ที่กรอกเลข)
@@ -135,10 +141,6 @@ export default function RegisterPage() {
                 {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
-            <div className="field">
-              <label>ประเภทธุรกิจ</label>
-              <input value={form.businessType} onChange={set('businessType')} />
-            </div>
 
             <div style={{ fontWeight: 600, fontSize: 14, margin: '16px 0 8px', color: '#1e3a8a' }}>ผู้ประสานงาน</div>
             <div className="field">
@@ -155,7 +157,7 @@ export default function RegisterPage() {
             </div>
 
             <p style={{ fontSize: 12, color: '#94a3b8', margin: '10px 0 0' }}>
-              ข้อมูลกิจการเพิ่มเติมและบริการที่ต้องการ เลือกได้ภายหลังในระบบ
+              ข้อมูลกิจการเพิ่มเติม (เช่น ประเภทธุรกิจ) และบริการที่ต้องการ กรอกได้ภายหลังในหน้าโปรไฟล์
             </p>
           </>
         )}
@@ -169,6 +171,10 @@ export default function RegisterPage() {
               <label>ชื่อ-นามสกุล ผู้ประสานงาน</label>
               <input value={form.coordName} onChange={set('coordName')} />
             </div>
+            <div className="field">
+              <label>เบอร์โทรศัพท์ *</label>
+              <input value={form.coordPhone} onChange={set('coordPhone')} placeholder="ต้องระบุ" />
+            </div>
           </>
         )}
         {roleType === 'expert' && (
@@ -180,6 +186,10 @@ export default function RegisterPage() {
             <div className="field">
               <label>ชื่อ-นามสกุล</label>
               <input value={form.coordName} onChange={set('coordName')} />
+            </div>
+            <div className="field">
+              <label>เบอร์โทรศัพท์ *</label>
+              <input value={form.coordPhone} onChange={set('coordPhone')} placeholder="ต้องระบุ" />
             </div>
           </>
         )}
