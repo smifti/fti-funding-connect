@@ -31,13 +31,14 @@ type Profile = {
 }
 
 export default function AgencyTabs({
-  profile, requests, smeList, packages, applicants,
+  profile, requests, smeList, packages, applicants, currentUser,
 }: {
   profile: Profile
   requests: any[]
   smeList: any[]
   packages: any[]
   applicants: any[]
+  currentUser: { id: string; name: string; role: string }
 }) {
   const [tab, setTab] = useState<'overview' | 'packages' | 'profile' | 'sme'>('overview')
   const cats = (profile.agency_categories ?? []) as string[]
@@ -100,8 +101,8 @@ export default function AgencyTabs({
         </div>
       )}
 
-      {tab === 'sme' && (
-        <AgencyApplicants initial={applicants} />
+     {tab === 'sme' && (
+        <AgencyApplicants initial={applicants} currentUser={currentUser} />
       )}
 
       {tab === 'packages' && (
