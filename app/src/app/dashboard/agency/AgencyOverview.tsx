@@ -22,7 +22,7 @@ export default function AgencyOverview({
   applicants: any[]
   packages: any[]
   applicantCounts: Record<string, number>
-  onGoApplicants: (pkgId?: string) => void
+  onGoApplicants: (pkgId?: string, pkgTitle?: string) => void
   onGoPackages: () => void
 }) {
   // นับตามสถานะ
@@ -96,7 +96,7 @@ export default function AgencyOverview({
                     <span style={{ fontSize: 13, color: '#64748b' }}> · {a.packages?.title ?? '—'}</span>
                     <div style={{ fontSize: 12, color: '#a16207' }}>{STATUS_TEXT[st] ?? st}</div>
                   </div>
-                  <button className="btn btn-sm" onClick={() => onGoApplicants()}>จัดการ</button>
+                  <button className="btn btn-sm" onClick={() => onGoApplicants(p.id, p.title)}>ดูผู้สมัคร</button>
                 </div>
               )
             })}
