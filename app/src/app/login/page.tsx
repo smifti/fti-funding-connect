@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   async function onSubmit() {
     setErr(''); setLoading(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -29,10 +30,29 @@ export default function LoginPage() {
           <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                  onKeyDown={e => e.key === 'Enter' && onSubmit()} placeholder="you@example.com" />
         </div>
-        <div className="field">
+       <div className="field">
           <label>รหัสผ่าน</label>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                 onKeyDown={e => e.key === 'Enter' && onSubmit()} placeholder="••••••••" />
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && onSubmit()}
+              placeholder="••••••••"
+              style={{ width: '100%', paddingRight: 44 }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 4,
+                color: '#64748b', lineHeight: 1,
+              }}
+              title={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}>
+              {showPassword ? '🙈' : '👁'}
+            </button>
+          </div>
         </div>
         <button className="btn" onClick={onSubmit} disabled={loading}>
           {loading ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
