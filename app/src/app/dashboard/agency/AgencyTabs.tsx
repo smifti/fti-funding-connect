@@ -26,8 +26,9 @@ type Profile = {
   full_name: string | null
   phone: string | null
   agency_email: string | null
-  agency_website: string | null
+agency_website: string | null
   agency_description: string | null
+  agency_logo: string | null
 }
 
 export default function AgencyTabs({
