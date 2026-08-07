@@ -29,6 +29,7 @@ export default function RegisterPage() {
   const [err, setErr] = useState('')
   const [ok, setOk] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const set = (k: string) => (e: any) => setForm({ ...form, [k]: e.target.value })
   const roleDesc = roleType === 'sme' ? 'ยื่นคำขอรับการสนับสนุน'
@@ -201,7 +202,25 @@ export default function RegisterPage() {
         </div>
         <div className="field">
           <label>รหัสผ่าน</label>
-          <input type="password" value={form.password} onChange={set('password')} />
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={form.password}
+              onChange={set('password')}
+              style={{ width: '100%', paddingRight: 44 }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 4,
+                color: '#64748b', lineHeight: 1,
+              }}
+              title={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}>
+              {showPassword ? '🙈' : '👁'}
+            </button>
+          </div>
         </div>
         <button className="btn" onClick={onSubmit} disabled={loading}>
           {loading ? 'กำลังลงทะเบียน…' : 'ลงทะเบียน'}
