@@ -2,7 +2,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
-
 const STEPS = [
   { key: 'submitted', label: 'ยื่นสมัคร' },
   { key: 'screening', label: 'พิจารณาคุณสมบัติ' },
@@ -18,7 +17,6 @@ const STATE_LABEL: Record<string, string> = {
 const ROLE_LABEL: Record<string, string> = {
   agency: 'หน่วยงาน', expert: 'ที่ปรึกษา', admin: 'ผู้ดูแลระบบ',
 }
-
 type StepState = { state: 'pending' | 'passed' | 'failed'; note?: string }
 type LogRow = {
   id: string
@@ -31,6 +29,7 @@ type LogRow = {
 }
 type App = {
   id: string
+  package_id?: string
   status: string
   steps: Record<string, StepState>
   created_at: string
@@ -38,18 +37,18 @@ type App = {
   sme_profiles: { company_name: string | null; province: string | null; sme_one_id: string | null } | null
   application_logs?: LogRow[]
 }
-
 const STATE_COLOR = {
   pending: { border: '#cbd5e1', bg: '#fff', fg: '#94a3b8' },
   passed: { border: '#16a34a', bg: '#16a34a', fg: '#fff' },
   failed: { border: '#dc2626', bg: '#dc2626', fg: '#fff' },
 }
-
 export default function AgencyApplicants({
-  initial, currentUser,
+  initial, currentUser, filterPackageId, onClearFilter,
 }: {
   initial: App[]
   currentUser: { id: string; name: string; role: string }
+  filterPackageId?: string | null
+  onClearFilter?: () => void
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -64,11 +63,9 @@ export default function AgencyApplicants({
     if (steps.completed?.state === 'passed') return 'completed'
     return 'in_progress'
   }
-
   async function setStep(app: App, stepKey: string, state: StepState['state'], note: string | null) {
     setBusy(app.id); setMsg('')
     const newSteps = { ...app.steps, [stepKey]: { state, ...(note ? { note } : {}) } }
-    // 1) อัปเดตสถานะใบสมัคร
     const { error } = await supabase
       .from('package_applications')
       .update({
@@ -78,7 +75,6 @@ export default function AgencyApplicants({
       })
       .eq('id', app.id)
     if (error) { setBusy(null); setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
-    // 2) บันทึก log ว่าใครแก้
     await supabase.from('application_logs').insert({
       application_id: app.id,
       step_key: stepKey,
@@ -92,12 +88,19 @@ export default function AgencyApplicants({
     setEditing(null); setFailNote('')
     router.refresh()
   }
-
   function isStepOpen(steps: Record<string, StepState>, idx: number): boolean {
     if (idx === 0) return true
     const prevKey = STEPS[idx - 1].key
     return steps[prevKey]?.state === 'passed'
   }
+
+  // กรองเฉพาะแพ็กเกจที่เลือก (ถ้ามี)
+  const shown = filterPackageId
+    ? initial.filter(a => a.package_id === filterPackageId)
+    : initial
+  const filterTitle = filterPackageId
+    ? shown[0]?.packages?.title ?? 'แพ็กเกจที่เลือก'
+    : null
 
   if (initial.length === 0) {
     return (
@@ -107,20 +110,28 @@ export default function AgencyApplicants({
       </div>
     )
   }
-
   return (
     <div className="card">
-      <h2>ผู้สมัครแพ็กเกจ ({initial.length})</h2>
-      <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: -4, marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+        <h2 style={{ margin: 0 }}>
+          ผู้สมัครแพ็กเกจ ({shown.length})
+          {filterTitle && <span style={{ fontSize: 14, fontWeight: 400, color: '#64748b' }}> · {filterTitle}</span>}
+        </h2>
+        {filterPackageId && onClearFilter && (
+          <button className="btn btn-ghost btn-sm" onClick={onClearFilter}>✕ ดูทุกแพ็กเกจ</button>
+        )}
+      </div>
+      <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4, marginBottom: 12 }}>
         คลิกที่หมุดเพื่อกำหนดสถานะ (ผ่าน / ไม่ผ่าน) — ต้องผ่านหมุดก่อนหน้าจึงจะทำหมุดถัดไปได้
       </p>
       {msg && (
         <div style={{ background: '#fee2e2', color: '#991b1b', padding: '8px 12px',
           borderRadius: 8, margin: '12px 0', fontSize: 14 }}>{msg}</div>
       )}
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 12 }}>
-        {initial.map(a => {
+        {shown.length === 0 ? (
+          <p className="empty">ไม่มีผู้สมัครในแพ็กเกจนี้</p>
+        ) : shown.map(a => {
           const steps = a.steps ?? {}
           const logs = a.application_logs ?? []
           return (
