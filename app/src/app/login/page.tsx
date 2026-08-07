@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
-
 export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -11,7 +10,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
-
   async function onSubmit() {
     setErr(''); setLoading(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -20,12 +18,11 @@ export default function LoginPage() {
     router.push('/dashboard')
     router.refresh()
   }
-
   return (
     <div className="auth-wrap">
       <div className="auth-card">
         <h1>FTI SME Funding Connect</h1>
-        <p className="sub">เข้าสู่ระบบเพื่อติดตามสถานะคำขอของคุณ</p>
+        <p className="sub">แพลตฟอร์มเชื่อมโยง SME ผู้ให้บริการ และที่ปรึกษา เพื่อการสนับสนุนธุรกิจ</p>
         {err && <div className="alert alert-err">{err}</div>}
         <div className="field">
           <label>อีเมล</label>
@@ -41,7 +38,7 @@ export default function LoginPage() {
           {loading ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
         </button>
         <div className="link-row">
-          ยังไม่มีบัญชี? <Link href="/register">ลงทะเบียน SME</Link>
+          ยังไม่มีบัญชี? <Link href="/register">ลงทะเบียนใช้งาน</Link>
         </div>
       </div>
     </div>
