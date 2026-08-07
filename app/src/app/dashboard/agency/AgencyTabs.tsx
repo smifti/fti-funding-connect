@@ -132,6 +132,8 @@ function AgencyProfileForm({ profile }: { profile: Profile }) {
     agency_website: profile.agency_website ?? '',
     agency_description: profile.agency_description ?? '',
   })
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(profile.agency_logo ?? null)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
 
@@ -139,19 +141,38 @@ function AgencyProfileForm({ profile }: { profile: Profile }) {
     setForm(f => ({ ...f, [k]: v }))
   }
 
+  function onPickLogo(file: File | null) {
+    setLogoFile(file)
+    if (file) setLogoPreview(URL.createObjectURL(file))
+  }
+
   async function save() {
     setBusy(true); setMsg('')
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        agency_name: form.agency_name || null,
-        full_name: form.full_name || null,
-        phone: form.phone || null,
-        agency_email: form.agency_email || null,
-        agency_website: form.agency_website || null,
-        agency_description: form.agency_description || null,
-      })
-      .eq('id', profile.id)
+
+    // อัปโหลด logo ใหม่ (ถ้าเลือก)
+    let logoUrl: string | undefined = undefined
+    if (logoFile) {
+      const ext = logoFile.name.split('.').pop()
+      const path = `logos/${profile.id}-${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('package-images')
+        .upload(path, logoFile)
+      if (upErr) { setBusy(false); setMsg('อัปโหลดโลโก้ไม่สำเร็จ: ' + upErr.message); return }
+      const { data: pub } = supabase.storage.from('package-images').getPublicUrl(path)
+      logoUrl = pub.publicUrl
+    }
+
+    const payload: any = {
+      agency_name: form.agency_name || null,
+      full_name: form.full_name || null,
+      phone: form.phone || null,
+      agency_email: form.agency_email || null,
+      agency_website: form.agency_website || null,
+      agency_description: form.agency_description || null,
+    }
+    if (logoUrl !== undefined) payload.agency_logo = logoUrl
+
+    const { error } = await supabase.from('profiles').update(payload).eq('id', profile.id)
     setBusy(false)
     if (error) { setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
     setMsg('บันทึกเรียบร้อยแล้ว')
@@ -175,6 +196,25 @@ function AgencyProfileForm({ profile }: { profile: Profile }) {
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div>
+          <label style={labelStyle}>โลโก้หน่วยงาน</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 6 }}>
+            <div style={{
+              width: 72, height: 72, borderRadius: 12, border: '1px solid #e2e8f0',
+              background: '#f8fafc', flexShrink: 0, overflow: 'hidden',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {logoPreview ? (
+                <img src={logoPreview} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              ) : (
+                <span style={{ fontSize: 11, color: '#cbd5e1' }}>ไม่มีโลโก้</span>
+              )}
+            </div>
+            <input type="file" accept="image/*"
+              onChange={e => onPickLogo(e.target.files?.[0] ?? null)}
+              style={{ fontSize: 13 }} />
+          </div>
+        </div>
         <div>
           <label style={labelStyle}>ชื่อหน่วยงาน / บริษัท</label>
           <input style={fieldStyle} value={form.agency_name} onChange={e => set('agency_name', e.target.value)} />
