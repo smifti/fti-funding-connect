@@ -42,6 +42,7 @@ export default function AgencyTabs({
 }) {
   const [tab, setTab] = useState<'overview' | 'packages' | 'profile' | 'sme'>('overview')
   const [filterPkg, setFilterPkg] = useState<string | null>(null)
+  const [filterPkgTitle, setFilterPkgTitle] = useState<string | null>(null)
   const cats = (profile.agency_categories ?? []) as string[]
   const tabStyle = (active: boolean) => ({
     border: 'none', background: 'none', cursor: 'pointer',
@@ -64,7 +65,7 @@ export default function AgencyTabs({
         <button onClick={() => setTab('packages')} style={tabStyle(tab === 'packages')}>
           แพ็กเกจของฉัน ({packages.length})
         </button>
-        <button onClick={() => { setFilterPkg(null); setTab('sme') }} style={tabStyle(tab === 'sme')}>
+        <button onClick={() => { setFilterPkg(null); setFilterPkgTitle(null); setTab('sme') }} style={tabStyle(tab === 'sme')}>
           ผู้สมัครแพ็กเกจ ({applicants.length})
         </button>
         <button onClick={() => setTab('profile')} style={tabStyle(tab === 'profile')}>
@@ -76,13 +77,14 @@ export default function AgencyTabs({
           applicants={applicants}
           packages={packages}
           applicantCounts={applicantCounts}
-          onGoApplicants={(pkgId?: string) => { setFilterPkg(pkgId ?? null); setTab('sme') }}
+          onGoApplicants={(pkgId?: string, pkgTitle?: string) => { setFilterPkg(pkgId ?? null); setFilterPkgTitle(pkgTitle ?? null); setTab('sme') }}
           onGoPackages={() => setTab('packages')}
         />
       )}
       {tab === 'sme' && (
         <AgencyApplicants initial={applicants} currentUser={currentUser}
-          filterPackageId={filterPkg} onClearFilter={() => setFilterPkg(null)} />
+          filterPackageId={filterPkg} filterPackageTitle={filterPkgTitle}
+          onClearFilter={() => { setFilterPkg(null); setFilterPkgTitle(null) }} />
       )}
       {tab === 'packages' && (
         <AgencyPackages
