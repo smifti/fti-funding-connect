@@ -17,6 +17,11 @@ const TEMPLATE_LABELS: Record<string, string> = {
   loan: 'สินเชื่อ',
   grant: 'หน่วยงานให้ทุน / บริการอื่น ๆ',
 }
+const SERVICE_LABELS: Record<string, string> = {
+  open: '🟢 เปิดให้บริการ',
+  paused: '⚪ ปิดรับชั่วคราว',
+  ended: '⚫ สิ้นสุดโครงการ',
+}
 
 type Pkg = {
   id: string
@@ -34,6 +39,7 @@ type Pkg = {
   image_url: string | null
   approval_status: string
   is_active: boolean
+  service_status: string
 }
 
 const EMPTY_FORM = {
@@ -163,9 +169,9 @@ export default function AgencyPackages({
     router.refresh()
   }
 
-  async function toggleActive(id: string, current: boolean) {
+  async function changeService(id: string, value: string) {
     setBusy(true)
-    await supabase.from('packages').update({ is_active: !current }).eq('id', id)
+    await supabase.from('packages').update({ service_status: value }).eq('id', id)
     setBusy(false)
     router.refresh()
   }
@@ -348,20 +354,28 @@ export default function AgencyPackages({
                       padding: '3px 10px', borderRadius: 12, whiteSpace: 'nowrap' }}>
                       {ap.text}
                     </span>
-                    {!p.is_active && (
-                      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>ปิดการแสดงผล</div>
+                    {p.approval_status === 'approved' && (
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                        {SERVICE_LABELS[p.service_status] ?? p.service_status}
+                      </div>
                     )}
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <td>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                       <button className="btn btn-ghost btn-sm" disabled={busy}
                         onClick={() => openEdit(p)}>
                         แก้ไข
                       </button>
-                      <button className="btn btn-ghost btn-sm" disabled={busy}
-                        onClick={() => toggleActive(p.id, p.is_active)}>
-                        {p.is_active ? 'ปิด' : 'เปิด'}
-                      </button>
+                      <select
+                        value={p.service_status ?? 'open'}
+                        disabled={busy}
+                        onChange={e => changeService(p.id, e.target.value)}
+                        style={{ fontSize: 12, padding: '4px 6px', borderRadius: 6, border: '1px solid #cbd5e1' }}>
+                        <option value="open">🟢 เปิดรับ</option>
+                        <option value="paused">⚪ ปิดชั่วคราว</option>
+                        <option value="ended">⚫ สิ้นสุด</option>
+                      </select>
                       <button className="btn btn-ghost btn-sm" disabled={busy}
                         onClick={() => remove(p.id)} style={{ color: '#dc2626' }}>
                         ลบ
