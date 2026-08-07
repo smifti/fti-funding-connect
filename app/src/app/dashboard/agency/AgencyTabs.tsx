@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-browser'
 import AgencyAction from './AgencyAction'
 import AgencyPackages from './AgencyPackages'
 import AgencyApplicants from './AgencyApplicants'
+import AgencyOverview from './AgencyOverview'
 
 const CATEGORY_LABELS: Record<string, string> = {
   credit: 'สินเชื่อ', innovation: 'นวัตกรรม', management: 'บริหารจัดการ',
@@ -62,7 +63,7 @@ export default function AgencyTabs({
 
       <div style={{ display: 'flex', gap: 16, marginBottom: 20, borderBottom: '1px solid #e2e8f0' }}>
         <button onClick={() => setTab('overview')} style={tabStyle(tab === 'overview')}>
-          คำขอที่ส่งต่อมา
+          ภาพรวม
         </button>
         <button onClick={() => setTab('packages')} style={tabStyle(tab === 'packages')}>
           แพ็กเกจของฉัน ({packages.length})
@@ -75,32 +76,14 @@ export default function AgencyTabs({
         </button>
       </div>
 
-      {tab === 'overview' && (
-        <div className="card">
-          <h2>คำขอที่ส่งต่อมายังหน่วยงาน ({requests.length})</h2>
-          {requests.length === 0 ? (
-            <p className="empty">ยังไม่มีคำขอที่ส่งต่อมา</p>
-          ) : (
-            <table>
-              <thead>
-                <tr><th>กิจการ</th><th>SME ONE ID</th><th>ด้าน</th><th>สถานะ</th><th>การดำเนินการ</th></tr>
-              </thead>
-              <tbody>
-                {requests.map((r: any) => (
-                  <tr key={r.id}>
-                    <td>{r.sme_profiles?.company_name}
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>{r.sme_profiles?.province}</div>
-                    </td>
-                    <td>{r.sme_profiles?.sme_one_id ?? '—'}</td>
-                    <td>{CATEGORY_LABELS[r.category]}</td>
-                    <td><Badge status={r.status} /></td>
-                    <td><AgencyAction requestId={r.id} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+{tab === 'overview' && (
+        <AgencyOverview
+          applicants={applicants}
+          packages={packages}
+          applicantCounts={applicantCounts}
+          onGoApplicants={() => setTab('sme')}
+          onGoPackages={() => setTab('packages')}
+        />
       )}
 
       {tab === 'sme' && (
