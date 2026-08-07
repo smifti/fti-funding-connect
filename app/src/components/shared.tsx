@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
-
 export const CATEGORY_LABELS: Record<string, string> = {
   credit: 'สินเชื่อ',
   innovation: 'นวัตกรรม',
@@ -10,7 +9,6 @@ export const CATEGORY_LABELS: Record<string, string> = {
   upskill: 'Upskill / Reskill',
   other: 'อื่น ๆ (ESG)',
 }
-
 export const STATUS_LABELS: Record<string, string> = {
   submitted: 'ยื่นแล้ว',
   screening: 'กำลังคัดกรอง',
@@ -19,18 +17,15 @@ export const STATUS_LABELS: Record<string, string> = {
   approved: 'สำเร็จ',
   rejected: 'ไม่ผ่าน',
 }
-
 export const ROLE_LABELS: Record<string, string> = {
   sme: 'ผู้ประกอบการ SME',
   agency: 'หน่วยงานสนับสนุน',
   expert: 'ที่ปรึกษา / ผู้เชี่ยวชาญ',
   admin: 'ส.อ.ท. / ผู้ดูแลระบบ',
 }
-
 export function Badge({ status }: { status: string }) {
   return <span className={`badge b-${status}`}>{STATUS_LABELS[status] ?? status}</span>
 }
-
 async function signOut() {
   'use server'
   const supabase = await createClient()
@@ -38,7 +33,20 @@ async function signOut() {
   redirect('/login')
 }
 
-export function TopBar({ role }: { role: string }) {
+// นับจำนวนแพ็กเกจที่รออนุมัติ (สำหรับ admin/expert)
+async function getPendingCount(): Promise<number> {
+  const supabase = await createClient()
+  const { count } = await supabase
+    .from('packages')
+    .select('id', { count: 'exact', head: true })
+    .eq('approval_status', 'pending')
+  return count ?? 0
+}
+
+export async function TopBar({ role }: { role: string }) {
+  const isReviewer = role === 'admin' || role === 'expert'
+  const pendingCount = isReviewer ? await getPendingCount() : 0
+
   return (
     <div className="topbar">
       <div className="container">
@@ -47,23 +55,37 @@ export function TopBar({ role }: { role: string }) {
           <span className="role-pill">{ROLE_LABELS[role] ?? role}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-{(role === 'admin' || role === 'expert') && (
+          {role === 'admin' && (
+            <>
+              <a href="/dashboard/manage-users" className="btn btn-ghost btn-sm"
+                style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
+                จัดการผู้ใช้
+              </a>
+              <a href="/dashboard/approvals" className="btn btn-ghost btn-sm"
+                style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
+                อนุมัติผู้ใช้
+              </a>
+            </>
+          )}
+          {isReviewer && (
             <>
               <a href="/dashboard/package-approvals" className="btn btn-ghost btn-sm"
-                style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
+                style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)', position: 'relative' }}>
                 อนุมัติแพ็กเกจ
+                {pendingCount > 0 && (
+                  <span style={{
+                    background: '#dc2626', color: '#fff', fontSize: 11, fontWeight: 700,
+                    borderRadius: 10, padding: '1px 7px', marginLeft: 6,
+                  }}>
+                    {pendingCount}
+                  </span>
+                )}
               </a>
               <a href="/dashboard/applications" className="btn btn-ghost btn-sm"
                 style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
                 จัดการใบสมัคร
               </a>
             </>
-          )}
-          {(role === 'admin' || role === 'expert') && (
-            <a href="/dashboard/package-approvals" className="btn btn-ghost btn-sm"
-              style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
-              อนุมัติแพ็กเกจ
-            </a>
           )}
           <form action={signOut}>
             <button className="btn btn-ghost btn-sm" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
