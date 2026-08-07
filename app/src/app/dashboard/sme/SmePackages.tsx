@@ -8,6 +8,11 @@ const CATEGORY_LABELS: Record<string, string> = {
   marketing: 'การตลาด', production: 'การผลิต', upskill: 'Upskill / Reskill',
   other: 'อื่น ๆ (ESG)',
 }
+const SERVICE_INFO: Record<string, { label: string; bg: string; color: string; canApply: boolean }> = {
+  open: { label: '🟢 เปิดให้บริการ', bg: '#dcfce7', color: '#166534', canApply: true },
+  paused: { label: '⚪ ปิดรับชั่วคราว', bg: '#f1f5f9', color: '#64748b', canApply: false },
+  ended: { label: '⚫ สิ้นสุดโครงการ', bg: '#e2e8f0', color: '#475569', canApply: false },
+}
 
 type Pkg = {
   id: string
@@ -23,6 +28,7 @@ type Pkg = {
   target_industry: string | null
   open_period: string | null
   image_url: string | null
+  service_status?: string
   created_at?: string
   profiles: { agency_name: string | null; agency_email: string | null; phone: string | null } | null
 }
@@ -41,18 +47,15 @@ export default function SmePackages({
   const [applied, setApplied] = useState<string[]>(appliedIds)
   const [detail, setDetail] = useState<Pkg | null>(null)
 
-  // ตัวกรอง/ค้นหา/เรียง
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('all')
   const [sortBy, setSortBy] = useState('newest')
 
-  // ด้านที่มีจริงในรายการแพ็กเกจ (เอาไว้ทำปุ่มกรอง)
   const availableCats = useMemo(() => {
     const set = new Set(packages.map(p => p.category))
     return Array.from(set)
   }, [packages])
 
-  // ผลลัพธ์หลังกรอง+ค้นหา+เรียง
   const shown = useMemo(() => {
     let list = [...packages]
     if (catFilter !== 'all') list = list.filter(p => p.category === catFilter)
@@ -139,6 +142,7 @@ export default function SmePackages({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {shown.map(p => {
             const isApplied = applied.includes(p.id)
+            const svc = SERVICE_INFO[p.service_status ?? 'open'] ?? SERVICE_INFO.open
             return (
               <div key={p.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden',
                 background: '#fff', display: 'flex', flexDirection: 'column' }}>
@@ -171,15 +175,25 @@ export default function SmePackages({
                       {p.price_note && <span style={{ fontSize: 12, fontWeight: 400, color: '#64748b' }}> · {p.price_note}</span>}
                     </div>
                   )}
+                  {p.service_status && p.service_status !== 'open' && (
+                    <div style={{ background: svc.bg, color: svc.color, fontSize: 12,
+                      padding: '3px 10px', borderRadius: 8, alignSelf: 'flex-start', marginBottom: 8 }}>
+                      {svc.label}
+                    </div>
+                  )}
                   <div style={{ marginTop: 'auto', display: 'flex', gap: 6 }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => setDetail(p)}>รายละเอียด</button>
                     {isApplied ? (
                       <button className="btn btn-sm" disabled style={{ background: '#dcfce7', color: '#166534', border: 'none' }}>
                         ✓ สมัครแล้ว
                       </button>
-                    ) : (
+                    ) : svc.canApply ? (
                       <button className="btn btn-sm" disabled={busy === p.id} onClick={() => apply(p.id)}>
                         {busy === p.id ? '…' : 'สนใจ / สมัคร'}
+                      </button>
+                    ) : (
+                      <button className="btn btn-sm" disabled style={{ background: '#f1f5f9', color: '#94a3b8', border: 'none' }}>
+                        {p.service_status === 'ended' ? 'สิ้นสุดโครงการ' : 'ปิดรับชั่วคราว'}
                       </button>
                     )}
                   </div>
@@ -205,6 +219,13 @@ export default function SmePackages({
               <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>
                 โดย: {detail.profiles?.agency_name || '—'}
               </div>
+              {detail.service_status && detail.service_status !== 'open' && (
+                <div style={{ background: (SERVICE_INFO[detail.service_status] ?? SERVICE_INFO.open).bg,
+                  color: (SERVICE_INFO[detail.service_status] ?? SERVICE_INFO.open).color, fontSize: 13,
+                  padding: '4px 12px', borderRadius: 8, display: 'inline-block', marginBottom: 12 }}>
+                  {(SERVICE_INFO[detail.service_status] ?? SERVICE_INFO.open).label}
+                </div>
+              )}
               {detail.description && <p style={{ fontSize: 14, marginBottom: 14 }}>{detail.description}</p>}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14, color: '#334155' }}>
@@ -224,9 +245,13 @@ export default function SmePackages({
                   <button className="btn" disabled style={{ background: '#dcfce7', color: '#166534', border: 'none' }}>
                     ✓ สมัครแล้ว
                   </button>
-                ) : (
+                ) : (SERVICE_INFO[detail.service_status ?? 'open'] ?? SERVICE_INFO.open).canApply ? (
                   <button className="btn" disabled={busy === detail.id} onClick={() => apply(detail.id)}>
                     {busy === detail.id ? 'กำลังสมัคร…' : 'สนใจ / สมัคร'}
+                  </button>
+                ) : (
+                  <button className="btn" disabled style={{ background: '#f1f5f9', color: '#94a3b8', border: 'none' }}>
+                    {detail.service_status === 'ended' ? 'สิ้นสุดโครงการ' : 'ปิดรับชั่วคราว'}
                   </button>
                 )}
                 <button className="btn btn-ghost" onClick={() => setDetail(null)}>ปิด</button>
