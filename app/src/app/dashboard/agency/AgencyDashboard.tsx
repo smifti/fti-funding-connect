@@ -4,7 +4,7 @@ export default async function AgencyDashboard({ userId }: { userId: string }) {
   const supabase = await createClient()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, agency_name, agency_categories, full_name, phone, agency_email, agency_website, agency_description')
+    .select('id, agency_name, agency_categories, full_name, phone, agency_email, agency_website, agency_description, agency_logo')
     .eq('id', userId)
     .single()
   const { data: requests } = await supabase
