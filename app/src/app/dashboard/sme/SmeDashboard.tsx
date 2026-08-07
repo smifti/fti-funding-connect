@@ -57,7 +57,7 @@ export default async function SmeDashboard({ userId }: { userId: string }) {
   // แพ็กเกจที่ SME นี้สมัครไปแล้ว (พร้อม timeline)
   const { data: apps } = await supabase
     .from('package_applications')
-    .select('id, package_id, status, steps, created_at, packages(title, category, image_url, profiles(agency_name))')
+    .select('id, package_id, status, steps, created_at, packages(title, category, image_url, approval_status, is_active, service_status, profiles(agency_name))')
     .eq('sme_id', sme.id)
     .order('created_at', { ascending: false })
   const appliedIds = (apps ?? []).map((a: any) => a.package_id).filter(Boolean)
