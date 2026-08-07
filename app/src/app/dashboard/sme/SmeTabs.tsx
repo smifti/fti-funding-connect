@@ -26,6 +26,23 @@ const STATE_COLOR: Record<string, { border: string; bg: string; fg: string }> = 
   failed: { border: '#dc2626', bg: '#dc2626', fg: '#fff' },
 }
 
+// ป้ายสถานะแพ็กเกจ (คำนวณจาก approval_status + service_status)
+function packageStatusBadge(pkg: any): { label: string; bg: string; color: string } | null {
+  if (!pkg) return null
+  const approval = pkg.approval_status
+  const service = pkg.service_status ?? 'open'
+  if (approval !== 'approved') {
+    return { label: '🟡 กำลังปรับปรุง / รออนุมัติจาก ส.อ.ท.', bg: '#fef9c3', color: '#a16207' }
+  }
+  if (service === 'paused') {
+    return { label: '⚪ ผู้ให้บริการปิดรับชั่วคราว', bg: '#f1f5f9', color: '#64748b' }
+  }
+  if (service === 'ended') {
+    return { label: '⚫ สิ้นสุดโครงการแล้ว', bg: '#e2e8f0', color: '#475569' }
+  }
+  return null  // เปิดปกติ = ไม่ต้องมีป้าย
+}
+
 const REQUIRED_FIELDS = [
   'company_name', 'sme_one_id', 'province', 'business_type',
   'coordinator_name', 'coordinator_phone', 'coordinator_email',
@@ -162,17 +179,26 @@ export default function SmeTabs({ sme, requests, health, packages, appliedIds, m
               <p className="empty">ยังไม่ได้สมัครแพ็กเกจ — ไปที่แท็บ "แพ็กเกจสนับสนุน" เพื่อเลือกสมัคร</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {myApplications.map(app => (
-                  <div key={app.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                      <div style={{ fontWeight: 600 }}>{app.packages?.title ?? '—'}</div>
-                      <div style={{ fontSize: 13, color: '#64748b' }}>
-                        {app.packages?.profiles?.agency_name ?? ''}
+                {myApplications.map(app => {
+                  const badge = packageStatusBadge(app.packages)
+                  return (
+                    <div key={app.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                        <div style={{ fontWeight: 600 }}>{app.packages?.title ?? '—'}</div>
+                        <div style={{ fontSize: 13, color: '#64748b' }}>
+                          {app.packages?.profiles?.agency_name ?? ''}
+                        </div>
                       </div>
+                      {badge && (
+                        <div style={{ marginTop: 8, background: badge.bg, color: badge.color,
+                          padding: '6px 12px', borderRadius: 8, fontSize: 13, display: 'inline-block' }}>
+                          {badge.label}
+                        </div>
+                      )}
+                      <AppTimeline steps={app.steps} />
                     </div>
-                    <AppTimeline steps={app.steps} />
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
