@@ -6,7 +6,6 @@ import AgencyAction from './AgencyAction'
 import AgencyPackages from './AgencyPackages'
 import AgencyApplicants from './AgencyApplicants'
 import AgencyOverview from './AgencyOverview'
-
 const CATEGORY_LABELS: Record<string, string> = {
   credit: 'สินเชื่อ', innovation: 'นวัตกรรม', management: 'บริหารจัดการ',
   marketing: 'การตลาด', production: 'การผลิต', upskill: 'Upskill / Reskill',
@@ -19,7 +18,6 @@ const STATUS_LABELS: Record<string, string> = {
 function Badge({ status }: { status: string }) {
   return <span className={`badge b-${status}`}>{STATUS_LABELS[status] ?? status}</span>
 }
-
 type Profile = {
   id: string
   agency_name: string | null
@@ -31,7 +29,6 @@ type Profile = {
   agency_description: string | null
   agency_logo: string | null
 }
-
 export default function AgencyTabs({
   profile, requests, smeList, packages, applicants, currentUser, applicantCounts,
 }: {
@@ -44,8 +41,8 @@ export default function AgencyTabs({
   applicantCounts: Record<string, number>
 }) {
   const [tab, setTab] = useState<'overview' | 'packages' | 'profile' | 'sme'>('overview')
+  const [filterPkg, setFilterPkg] = useState<string | null>(null)
   const cats = (profile.agency_categories ?? []) as string[]
-
   const tabStyle = (active: boolean) => ({
     border: 'none', background: 'none', cursor: 'pointer',
     padding: '10px 4px', fontSize: 15,
@@ -60,7 +57,6 @@ export default function AgencyTabs({
       <p className="page-sub">
         รับผิดชอบด้าน: {cats.map(c => CATEGORY_LABELS[c]).join(' · ') || '—'}
       </p>
-
       <div style={{ display: 'flex', gap: 16, marginBottom: 20, borderBottom: '1px solid #e2e8f0' }}>
         <button onClick={() => setTab('overview')} style={tabStyle(tab === 'overview')}>
           ภาพรวม
@@ -68,28 +64,26 @@ export default function AgencyTabs({
         <button onClick={() => setTab('packages')} style={tabStyle(tab === 'packages')}>
           แพ็กเกจของฉัน ({packages.length})
         </button>
-        <button onClick={() => setTab('sme')} style={tabStyle(tab === 'sme')}>
+        <button onClick={() => { setFilterPkg(null); setTab('sme') }} style={tabStyle(tab === 'sme')}>
           ผู้สมัครแพ็กเกจ ({applicants.length})
         </button>
         <button onClick={() => setTab('profile')} style={tabStyle(tab === 'profile')}>
           โปรไฟล์หน่วยงาน
         </button>
       </div>
-
-{tab === 'overview' && (
+      {tab === 'overview' && (
         <AgencyOverview
           applicants={applicants}
           packages={packages}
           applicantCounts={applicantCounts}
-          onGoApplicants={() => setTab('sme')}
+          onGoApplicants={(pkgId?: string) => { setFilterPkg(pkgId ?? null); setTab('sme') }}
           onGoPackages={() => setTab('packages')}
         />
       )}
-
       {tab === 'sme' && (
-        <AgencyApplicants initial={applicants} currentUser={currentUser} />
+        <AgencyApplicants initial={applicants} currentUser={currentUser}
+          filterPackageId={filterPkg} onClearFilter={() => setFilterPkg(null)} />
       )}
-
       {tab === 'packages' && (
         <AgencyPackages
           ownerId={profile.id}
@@ -98,12 +92,10 @@ export default function AgencyTabs({
           applicantCounts={applicantCounts}
         />
       )}
-
       {tab === 'profile' && <AgencyProfileForm profile={profile} />}
     </>
   )
 }
-
 function AgencyProfileForm({ profile }: { profile: Profile }) {
   const router = useRouter()
   const supabase = createClient()
@@ -121,20 +113,15 @@ function AgencyProfileForm({ profile }: { profile: Profile }) {
   const [uploadPct, setUploadPct] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
-
   function set(k: string, v: string) {
     setForm(f => ({ ...f, [k]: v }))
   }
-
   function onPickLogo(file: File | null) {
     setLogoFile(file)
     if (file) setLogoPreview(URL.createObjectURL(file))
   }
-
   async function save() {
     setBusy(true); setMsg('')
-
-    // อัปโหลด logo ใหม่ (ถ้าเลือก)
     let logoUrl: string | undefined = undefined
     if (logoFile) {
       setUploadPct(0)
@@ -153,7 +140,6 @@ function AgencyProfileForm({ profile }: { profile: Profile }) {
       logoUrl = pub.publicUrl
       setTimeout(() => setUploadPct(null), 600)
     }
-
     const payload: any = {
       agency_name: form.agency_name || null,
       full_name: form.full_name || null,
@@ -163,20 +149,17 @@ function AgencyProfileForm({ profile }: { profile: Profile }) {
       agency_description: form.agency_description || null,
     }
     if (logoUrl !== undefined) payload.agency_logo = logoUrl
-
     const { error } = await supabase.from('profiles').update(payload).eq('id', profile.id)
     setBusy(false)
     if (error) { setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
     setMsg('บันทึกเรียบร้อยแล้ว')
     router.refresh()
   }
-
   const fieldStyle = {
     width: '100%', padding: '8px 10px', fontSize: 14,
     borderRadius: 8, border: '1px solid #cbd5e1', marginTop: 4,
   } as const
   const labelStyle = { fontSize: 13, color: '#475569', fontWeight: 500 } as const
-
   return (
     <div className="card" style={{ maxWidth: 640 }}>
       <h2>ข้อมูลหน่วยงาน</h2>
