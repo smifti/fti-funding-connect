@@ -22,7 +22,7 @@ export default function AgencyOverview({
   applicants: any[]
   packages: any[]
   applicantCounts: Record<string, number>
-  onGoApplicants: () => void
+  onGoApplicants: (pkgId?: string) => void
   onGoPackages: () => void
 }) {
   // นับตามสถานะ
@@ -80,7 +80,7 @@ export default function AgencyOverview({
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <h2 style={{ margin: 0 }}>งานที่ต้องดำเนินการ</h2>
-          <button className="btn btn-ghost btn-sm" onClick={onGoApplicants}>ดูทั้งหมด</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => onGoApplicants()}>ดูทั้งหมด</button>
         </div>
         {todo.length === 0 ? (
           <p className="empty">ไม่มีงานค้าง 🎉</p>
@@ -96,7 +96,7 @@ export default function AgencyOverview({
                     <span style={{ fontSize: 13, color: '#64748b' }}> · {a.packages?.title ?? '—'}</span>
                     <div style={{ fontSize: 12, color: '#a16207' }}>{STATUS_TEXT[st] ?? st}</div>
                   </div>
-                  <button className="btn btn-sm" onClick={onGoApplicants}>จัดการ</button>
+                  <button className="btn btn-sm" onClick={() => onGoApplicants()}>จัดการ</button>
                 </div>
               )
             })}
@@ -141,7 +141,7 @@ export default function AgencyOverview({
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <span style={{ fontSize: 13 }}>สมัคร <strong style={{ color: '#1e3a8a' }}>{applicantCounts[p.id] ?? 0}</strong> ราย</span>
-                  <button className="btn btn-sm" onClick={onGoApplicants}>ดูผู้สมัคร</button>
+                  <button className="btn btn-sm" onClick={() => onGoApplicants(p.id)}>ดูผู้สมัคร</button>
                 </div>
               </div>
             ))}
