@@ -47,15 +47,15 @@ export function TopBar({ role }: { role: string }) {
           <span className="role-pill">{ROLE_LABELS[role] ?? role}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {role === 'admin' && (
+{(role === 'admin' || role === 'expert') && (
             <>
-              <a href="/dashboard/manage-users" className="btn btn-ghost btn-sm"
+              <a href="/dashboard/package-approvals" className="btn btn-ghost btn-sm"
                 style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
-                จัดการผู้ใช้
+                อนุมัติแพ็กเกจ
               </a>
-              <a href="/dashboard/approvals" className="btn btn-ghost btn-sm"
+              <a href="/dashboard/applications" className="btn btn-ghost btn-sm"
                 style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
-                อนุมัติผู้ใช้
+                จัดการใบสมัคร
               </a>
             </>
           )}
