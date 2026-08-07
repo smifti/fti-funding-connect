@@ -67,7 +67,7 @@ export default function AgencyPackages({
   const router = useRouter()
   const supabase = createClient()
   const [showForm, setShowForm] = useState(false)
-  const [editId, setEditId] = useState<string | null>(null)   // แพ็กเกจที่กำลังแก้ (null = สร้างใหม่)
+  const [editId, setEditId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -120,7 +120,6 @@ export default function AgencyPackages({
     if (!form.title.trim()) { setMsg('กรุณาระบุชื่อแพ็กเกจ'); return }
     setBusy(true); setMsg('')
 
-    // อัปโหลดรูปใหม่ (ถ้าเลือก)
     let imageUrl: string | null | undefined = undefined
     if (imageFile) {
       const ext = imageFile.name.split('.').pop()
@@ -150,12 +149,10 @@ export default function AgencyPackages({
 
     let error
     if (editId) {
-      // แก้ไข → กลับไปรออนุมัติใหม่
       payload.approval_status = 'pending'
       const res = await supabase.from('packages').update(payload).eq('id', editId)
       error = res.error
     } else {
-      // สร้างใหม่
       payload.owner_id = ownerId
       payload.image_url = imageUrl ?? null
       const res = await supabase.from('packages').insert(payload)
@@ -361,7 +358,6 @@ export default function AgencyPackages({
                     )}
                   </td>
                   <td>
-                    <td>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                       <button className="btn btn-ghost btn-sm" disabled={busy}
                         onClick={() => openEdit(p)}>
