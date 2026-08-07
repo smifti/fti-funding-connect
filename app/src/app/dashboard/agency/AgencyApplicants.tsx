@@ -43,11 +43,12 @@ const STATE_COLOR = {
   failed: { border: '#dc2626', bg: '#dc2626', fg: '#fff' },
 }
 export default function AgencyApplicants({
-  initial, currentUser, filterPackageId, onClearFilter,
+  initial, currentUser, filterPackageId, filterPackageTitle, onClearFilter,
 }: {
   initial: App[]
   currentUser: { id: string; name: string; role: string }
   filterPackageId?: string | null
+  filterPackageTitle?: string | null
   onClearFilter?: () => void
 }) {
   const router = useRouter()
@@ -99,7 +100,7 @@ export default function AgencyApplicants({
     ? initial.filter(a => a.package_id === filterPackageId)
     : initial
   const filterTitle = filterPackageId
-    ? shown[0]?.packages?.title ?? 'แพ็กเกจที่เลือก'
+    ? (filterPackageTitle ?? shown[0]?.packages?.title ?? 'แพ็กเกจที่เลือก')
     : null
 
   if (initial.length === 0) {
