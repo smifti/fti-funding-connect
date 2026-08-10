@@ -58,6 +58,8 @@ export default function AgencyApplicants({
   const [editing, setEditing] = useState<{ appId: string; stepKey: string } | null>(null)
   const [failNote, setFailNote] = useState('')
   const [showLog, setShowLog] = useState<string | null>(null)
+  // ตัวกรองภายในหน้า (chip) — เริ่มจากที่ส่งมา
+  const [localFilter, setLocalFilter] = useState<string | null>(filterPackageId ?? null)
 
   function overallStatus(steps: Record<string, StepState>): string {
     if (Object.values(steps).some(s => s.state === 'failed')) return 'rejected'
@@ -95,13 +97,31 @@ export default function AgencyApplicants({
     return steps[prevKey]?.state === 'passed'
   }
 
-  // กรองเฉพาะแพ็กเกจที่เลือก (ถ้ามี)
-  const shown = filterPackageId
-    ? initial.filter(a => a.package_id === filterPackageId)
+  // รายชื่อแพ็กเกจที่มีในใบสมัคร (ทำ chip) + จำนวนแต่ละอัน
+  const pkgList: { id: string; title: string; count: number }[] = []
+  const seen: Record<string, number> = {}
+  for (const a of initial) {
+    const pid = a.package_id
+    if (!pid) continue
+    if (!(pid in seen)) {
+      seen[pid] = pkgList.length
+      pkgList.push({ id: pid, title: a.packages?.title ?? '—', count: 0 })
+    }
+    pkgList[seen[pid]].count++
+  }
+
+  // กรองตาม chip ที่เลือก
+  const shown = localFilter
+    ? initial.filter(a => a.package_id === localFilter)
     : initial
-  const filterTitle = filterPackageId
-    ? (filterPackageTitle ?? shown[0]?.packages?.title ?? 'แพ็กเกจที่เลือก')
+  const activeTitle = localFilter
+    ? (pkgList.find(p => p.id === localFilter)?.title ?? filterPackageTitle ?? 'แพ็กเกจที่เลือก')
     : null
+
+  function clearAll() {
+    setLocalFilter(null)
+    onClearFilter?.()
+  }
 
   if (initial.length === 0) {
     return (
@@ -116,15 +136,25 @@ export default function AgencyApplicants({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <h2 style={{ margin: 0 }}>
           ผู้สมัครแพ็กเกจ ({shown.length})
-          {filterTitle && <span style={{ fontSize: 14, fontWeight: 400, color: '#64748b' }}> · {filterTitle}</span>}
+          {activeTitle && <span style={{ fontSize: 14, fontWeight: 400, color: '#64748b' }}> · {activeTitle}</span>}
         </h2>
-        {filterPackageId && onClearFilter && (
-          <button className="btn btn-ghost btn-sm" onClick={onClearFilter}>✕ ดูทุกแพ็กเกจ</button>
-        )}
       </div>
       <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4, marginBottom: 12 }}>
         คลิกที่หมุดเพื่อกำหนดสถานะ (ผ่าน / ไม่ผ่าน) — ต้องผ่านหมุดก่อนหน้าจึงจะทำหมุดถัดไปได้
       </p>
+
+      {/* แถบ chip กรองตามแพ็กเกจ */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        <button onClick={clearAll} style={chipStyle(localFilter === null)}>
+          ทั้งหมด ({initial.length})
+        </button>
+        {pkgList.map(p => (
+          <button key={p.id} onClick={() => setLocalFilter(p.id)} style={chipStyle(localFilter === p.id)}>
+            {p.title} ({p.count})
+          </button>
+        ))}
+      </div>
+
       {msg && (
         <div style={{ background: '#fee2e2', color: '#991b1b', padding: '8px 12px',
           borderRadius: 8, margin: '12px 0', fontSize: 14 }}>{msg}</div>
@@ -260,4 +290,14 @@ export default function AgencyApplicants({
       </div>
     </div>
   )
+}
+
+function chipStyle(active: boolean) {
+  return {
+    padding: '6px 14px', fontSize: 13, borderRadius: 20, cursor: 'pointer',
+    border: `1px solid ${active ? '#1e3a8a' : '#cbd5e1'}`,
+    background: active ? '#1e3a8a' : '#fff',
+    color: active ? '#fff' : '#475569',
+    fontWeight: active ? 600 : 400,
+  } as const
 }
