@@ -43,13 +43,14 @@ const STATE_COLOR = {
   failed: { border: '#dc2626', bg: '#dc2626', fg: '#fff' },
 }
 export default function AgencyApplicants({
-  initial, currentUser, filterPackageId, filterPackageTitle, onClearFilter,
+  initial, currentUser, filterPackageId, filterPackageTitle, onClearFilter, allPackages,
 }: {
   initial: App[]
   currentUser: { id: string; name: string; role: string }
   filterPackageId?: string | null
   filterPackageTitle?: string | null
   onClearFilter?: () => void
+  allPackages?: { id: string; title: string }[]
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -58,7 +59,6 @@ export default function AgencyApplicants({
   const [editing, setEditing] = useState<{ appId: string; stepKey: string } | null>(null)
   const [failNote, setFailNote] = useState('')
   const [showLog, setShowLog] = useState<string | null>(null)
-  // ตัวกรองภายในหน้า (chip) — เริ่มจากที่ส่งมา
   const [localFilter, setLocalFilter] = useState<string | null>(filterPackageId ?? null)
 
   function overallStatus(steps: Record<string, StepState>): string {
@@ -97,18 +97,20 @@ export default function AgencyApplicants({
     return steps[prevKey]?.state === 'passed'
   }
 
-  // รายชื่อแพ็กเกจที่มีในใบสมัคร (ทำ chip) + จำนวนแต่ละอัน
-  const pkgList: { id: string; title: string; count: number }[] = []
-  const seen: Record<string, number> = {}
+  // นับจำนวนผู้สมัครต่อแพ็กเกจ
+  const countByPkg: Record<string, number> = {}
+  const titleByPkg: Record<string, string> = {}
   for (const a of initial) {
     const pid = a.package_id
     if (!pid) continue
-    if (!(pid in seen)) {
-      seen[pid] = pkgList.length
-      pkgList.push({ id: pid, title: a.packages?.title ?? '—', count: 0 })
-    }
-    pkgList[seen[pid]].count++
+    countByPkg[pid] = (countByPkg[pid] ?? 0) + 1
+    if (a.packages?.title) titleByPkg[pid] = a.packages.title
   }
+  // รายชื่อ chip — ใช้แพ็กเกจทั้งหมด (รวมที่ 0 คน) ถ้าส่งมา, ไม่งั้น fallback จากใบสมัคร
+  const pkgList: { id: string; title: string; count: number }[] =
+    (allPackages && allPackages.length > 0)
+      ? allPackages.map(p => ({ id: p.id, title: p.title, count: countByPkg[p.id] ?? 0 }))
+      : Object.keys(countByPkg).map(pid => ({ id: pid, title: titleByPkg[pid] ?? '—', count: countByPkg[pid] }))
 
   // กรองตาม chip ที่เลือก
   const shown = localFilter
