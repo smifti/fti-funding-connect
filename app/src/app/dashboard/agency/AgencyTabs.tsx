@@ -84,7 +84,8 @@ export default function AgencyTabs({
       {tab === 'sme' && (
         <AgencyApplicants initial={applicants} currentUser={currentUser}
           filterPackageId={filterPkg} filterPackageTitle={filterPkgTitle}
-          onClearFilter={() => { setFilterPkg(null); setFilterPkgTitle(null) }} />
+          onClearFilter={() => { setFilterPkg(null); setFilterPkgTitle(null) }}
+          allPackages={packages.map((p: any) => ({ id: p.id, title: p.title }))} />
       )}
       {tab === 'packages' && (
         <AgencyPackages
