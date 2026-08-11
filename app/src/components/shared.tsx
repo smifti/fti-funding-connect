@@ -20,7 +20,7 @@ export const STATUS_LABELS: Record<string, string> = {
 export const ROLE_LABELS: Record<string, string> = {
   sme: 'ผู้ประกอบการ SME',
   agency: 'หน่วยงานสนับสนุน',
-  expert: 'ที่ปรึกษา / ผู้เชี่ยวชาญ',
+  expert: 'ผู้ให้บริการ',
   admin: 'ส.อ.ท. / ผู้ดูแลระบบ',
 }
 export function Badge({ status }: { status: string }) {
@@ -59,11 +59,11 @@ export async function TopBar({ role }: { role: string }) {
             <>
               <a href="/dashboard/manage-users" className="btn btn-ghost btn-sm"
                 style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
-                จัดการผู้ใช้
+                จัดการผู้ใช้งานทั้งหมด
               </a>
               <a href="/dashboard/approvals" className="btn btn-ghost btn-sm"
                 style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
-                อนุมัติผู้ใช้
+                อนุมัติผู้ให้บริการ/ที่ปรึกษา
               </a>
             </>
           )}
