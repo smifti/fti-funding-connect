@@ -6,6 +6,7 @@ import AgencyAction from './AgencyAction'
 import AgencyPackages from './AgencyPackages'
 import AgencyApplicants from './AgencyApplicants'
 import AgencyOverview from './AgencyOverview'
+import ChangePassword from '@/components/ChangePassword'
 const CATEGORY_LABELS: Record<string, string> = {
   credit: 'สินเชื่อ', innovation: 'นวัตกรรม', management: 'บริหารจัดการ',
   marketing: 'การตลาด', production: 'การผลิต', upskill: 'Upskill / Reskill',
@@ -95,7 +96,7 @@ export default function AgencyTabs({
           applicantCounts={applicantCounts}
         />
       )}
-      {tab === 'profile' && <AgencyProfileForm profile={profile} />}
+      {tab === 'profile' && <><AgencyProfileForm profile={profile} /><ChangePassword /></>}
     </>
   )
 }
