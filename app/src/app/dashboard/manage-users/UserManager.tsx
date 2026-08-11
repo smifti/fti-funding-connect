@@ -34,14 +34,13 @@ export default function UserManager({
 }: { initialUsers: User[]; myId: string }) {
   const router = useRouter()
   const supabase = createClient()
-  const [tab, setTab] = useState<'all' | 'sme' | 'agency' | 'expert' | 'admin' | 'approve'>('all')
+  const [tab, setTab] = useState<'all' | 'sme' | 'agency' | 'expert' | 'admin'>('all')
   const [editing, setEditing] = useState<string | null>(null)
   const [role, setRole] = useState('')
   const [agencyName, setAgencyName] = useState('')
   const [cats, setCats] = useState<string[]>([])
   const [msg, setMsg] = useState('')
   const [saving, setSaving] = useState(false)
-  const [approving, setApproving] = useState<string | null>(null)
 
   function startEdit(u: User) {
     setEditing(u.id)
@@ -66,22 +65,9 @@ export default function UserManager({
     setEditing(null)
     router.refresh()
   }
-  async function approve(userId: string) {
-    setApproving(userId); setMsg('')
-    const { error } = await supabase.rpc('admin_approve_user', { target_user_id: userId })
-    setApproving(null)
-    if (error) { setMsg('อนุมัติไม่สำเร็จ: ' + error.message); return }
-    router.refresh()
-  }
 
-  // นับจำนวนแต่ละบทบาท
   const countByRole = (r: string) => initialUsers.filter(u => u.role === r).length
-  // ผู้ใช้ที่รออนุมัติ (ขอสิทธิ์ agency/expert แต่ยังไม่อนุมัติ)
-  const pendingUsers = initialUsers.filter(u =>
-    u.approval_status === 'pending' || (u.requested_role && u.requested_role !== u.role))
-  const pendingCount = pendingUsers.length
 
-  // กรองตามแท็บ
   let shown = initialUsers
   if (tab === 'sme') shown = initialUsers.filter(u => u.role === 'sme')
   else if (tab === 'agency') shown = initialUsers.filter(u => u.role === 'agency')
@@ -100,7 +86,7 @@ export default function UserManager({
     <div>
       {msg && <div className="alert alert-err" style={{ marginBottom: 12 }}>{msg}</div>}
 
-      {/* แท็บ */}
+      {/* แท็บแยกตามบทบาท */}
       <div style={{ display: 'flex', gap: 14, marginBottom: 16, borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
         <button onClick={() => setTab('all')} style={tabStyle(tab === 'all')}>
           ทั้งหมด ({initialUsers.length})
@@ -117,134 +103,81 @@ export default function UserManager({
         <button onClick={() => setTab('admin')} style={tabStyle(tab === 'admin')}>
           ผู้ดูแล ({countByRole('admin')})
         </button>
-        <button onClick={() => setTab('approve')}
-          style={{ ...tabStyle(tab === 'approve'), marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-          อนุมัติผู้ใช้
-          {pendingCount > 0 && (
-            <span style={{
-              background: '#dc2626', color: '#fff', fontSize: 11, fontWeight: 700,
-              minWidth: 18, height: 18, borderRadius: 9, padding: '0 5px',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            }}>{pendingCount}</span>
-          )}
-        </button>
       </div>
 
-      {/* แท็บอนุมัติ */}
-      {tab === 'approve' ? (
-        <div className="card">
-          <h2 style={{ marginTop: 0 }}>คำขออนุมัติสิทธิ์</h2>
-          <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>
-            ผู้ใช้ที่สมัครขอเป็นหน่วยงานหรือที่ปรึกษา และรอการอนุมัติจาก ส.อ.ท.
-          </p>
-          {pendingUsers.length === 0 ? (
-            <p className="empty">ไม่มีผู้ใช้ที่รออนุมัติ 🎉</p>
-          ) : (
-            <table>
-              <thead>
-                <tr><th>ชื่อ / อีเมล</th><th>ขอสิทธิ์เป็น</th><th>สถานะ</th><th>การจัดการ</th></tr>
-              </thead>
-              <tbody>
-                {pendingUsers.map(u => (
-                  <tr key={u.id}>
-                    <td>{u.full_name || '—'}
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>{u.email}</div>
-                    </td>
-                    <td>{roleLabel(u.requested_role || u.role)}
-                      {u.agency_name && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{u.agency_name}</div>}
-                    </td>
-                    <td>
-                      <span style={{ background: '#fef9c3', color: '#a16207', fontSize: 12,
-                        padding: '3px 10px', borderRadius: 10, fontWeight: 600 }}>รออนุมัติ</span>
-                    </td>
-                    <td>
-                      <button className="btn btn-sm" disabled={approving === u.id}
-                        onClick={() => approve(u.id)}>
-                        {approving === u.id ? 'กำลังอนุมัติ…' : '✓ อนุมัติ'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      ) : (
-        /* แท็บรายชื่อผู้ใช้ */
-        <div className="card">
-          {shown.length === 0 ? (
-            <p className="empty">ไม่มีผู้ใช้ในกลุ่มนี้</p>
-          ) : (
-            <table>
-              <thead>
-                <tr><th>ชื่อ / อีเมล</th><th>บทบาทปัจจุบัน</th><th>การจัดการ</th></tr>
-              </thead>
-              <tbody>
-                {shown.map(u => (
-                  <tr key={u.id}>
-                    <td>
-                      {u.full_name || '—'}
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>{u.email}</div>
-                    </td>
-                    <td>
-                      {roleLabel(u.role)}
-                      {u.approval_status === 'pending' && (
-                        <span style={{ marginLeft: 6, background: '#fef9c3', color: '#a16207', fontSize: 11,
-                          padding: '2px 8px', borderRadius: 8, fontWeight: 600 }}>รออนุมัติ</span>
-                      )}
-                      {u.role === 'agency' && u.agency_categories && u.agency_categories.length > 0 && (
-                        <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                          {u.agency_name} · {u.agency_categories.map(c =>
-                            CATEGORY_OPTIONS.find(([v]) => v === c)?.[1]).join(', ')}
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      {editing === u.id ? (
-                        <div style={{ minWidth: 280 }}>
-                          <select value={role} onChange={e => setRole(e.target.value)}
-                            style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 8, marginBottom: 8 }}>
-                            {ROLE_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                          </select>
-                          {role === 'agency' && (
-                            <>
-                              <input value={agencyName} onChange={e => setAgencyName(e.target.value)}
-                                placeholder="ชื่อหน่วยงาน เช่น SME D Bank"
-                                style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 8, marginBottom: 8 }} />
-                              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>เลือกด้านที่รับผิดชอบ:</div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-                                {CATEGORY_OPTIONS.map(([v, l]) => (
-                                  <button key={v} type="button"
-                                    className={`cat-chip ${cats.includes(v) ? 'active' : ''}`}
-                                    onClick={() => toggleCat(v)}>{l}</button>
-                                ))}
-                              </div>
-                            </>
-                          )}
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <button className="btn btn-sm" disabled={saving} onClick={() => save(u.id)}>
-                              {saving ? 'กำลังบันทึก…' : 'บันทึก'}
-                            </button>
-                            <button className="btn btn-ghost btn-sm" onClick={() => setEditing(null)}>ยกเลิก</button>
-                          </div>
-                        </div>
-                      ) : (
-                        u.id === myId ? (
-                          <span style={{ fontSize: 13, color: 'var(--muted)' }}>บัญชีของคุณ</span>
-                        ) : (
-                          <button className="btn btn-ghost btn-sm" onClick={() => startEdit(u)}>
-                            เปลี่ยนสิทธิ์
+      <div className="card">
+        {shown.length === 0 ? (
+          <p className="empty">ไม่มีผู้ใช้ในกลุ่มนี้</p>
+        ) : (
+          <table>
+            <thead>
+              <tr><th>ชื่อ / อีเมล</th><th>บทบาทปัจจุบัน</th><th>การจัดการ</th></tr>
+            </thead>
+            <tbody>
+              {shown.map(u => (
+                <tr key={u.id}>
+                  <td>
+                    {u.full_name || '—'}
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{u.email}</div>
+                  </td>
+                  <td>
+                    {roleLabel(u.role)}
+                    {u.approval_status === 'pending' && (
+                      <span style={{ marginLeft: 6, background: '#fef9c3', color: '#a16207', fontSize: 11,
+                        padding: '2px 8px', borderRadius: 8, fontWeight: 600 }}>รออนุมัติ</span>
+                    )}
+                    {u.role === 'agency' && u.agency_categories && u.agency_categories.length > 0 && (
+                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                        {u.agency_name} · {u.agency_categories.map(c =>
+                          CATEGORY_OPTIONS.find(([v]) => v === c)?.[1]).join(', ')}
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    {editing === u.id ? (
+                      <div style={{ minWidth: 280 }}>
+                        <select value={role} onChange={e => setRole(e.target.value)}
+                          style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 8, marginBottom: 8 }}>
+                          {ROLE_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                        </select>
+                        {role === 'agency' && (
+                          <>
+                            <input value={agencyName} onChange={e => setAgencyName(e.target.value)}
+                              placeholder="ชื่อหน่วยงาน เช่น SME D Bank"
+                              style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 8, marginBottom: 8 }} />
+                            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>เลือกด้านที่รับผิดชอบ:</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                              {CATEGORY_OPTIONS.map(([v, l]) => (
+                                <button key={v} type="button"
+                                  className={`cat-chip ${cats.includes(v) ? 'active' : ''}`}
+                                  onClick={() => toggleCat(v)}>{l}</button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn btn-sm" disabled={saving} onClick={() => save(u.id)}>
+                            {saving ? 'กำลังบันทึก…' : 'บันทึก'}
                           </button>
-                        )
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+                          <button className="btn btn-ghost btn-sm" onClick={() => setEditing(null)}>ยกเลิก</button>
+                        </div>
+                      </div>
+                    ) : (
+                      u.id === myId ? (
+                        <span style={{ fontSize: 13, color: 'var(--muted)' }}>บัญชีของคุณ</span>
+                      ) : (
+                        <button className="btn btn-ghost btn-sm" onClick={() => startEdit(u)}>
+                          เปลี่ยนสิทธิ์
+                        </button>
+                      )
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   )
 }
