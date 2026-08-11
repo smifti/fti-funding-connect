@@ -105,9 +105,15 @@ function AppTimeline({ steps }: { steps: Record<string, any> }) {
   )
 }
 export default function SmeTabs({ sme, requests, health, packages, appliedIds, myApplications }: { sme: any; requests: any[]; health: any; packages: any[]; appliedIds: string[]; myApplications: any[] }) {
-  const [tab, setTab] = useState<'overview' | 'packages' | 'profile'>('overview')
+  const [tab, setTab] = useState<'overview' | 'packages' | 'profile' | 'settings'>('overview')
   const status = getStatus(sme)
   const info = STATUS_INFO[status]
+  const tabStyle = (active: boolean) => ({
+    border: 'none', background: 'none', cursor: 'pointer', padding: '10px 4px', fontSize: 15,
+    fontWeight: active ? 600 : 400,
+    color: active ? '#1e3a8a' : '#64748b',
+    borderBottom: active ? '2px solid #1e3a8a' : '2px solid transparent',
+  })
   return (
     <>
       <h1 className="page-title">{sme.company_name}</h1>
@@ -115,32 +121,14 @@ export default function SmeTabs({ sme, requests, health, packages, appliedIds, m
         {sme.sme_one_id ? `เลขนิติบุคคล: ${sme.sme_one_id} · ` : ''}{sme.province ?? '—'}
       </p>
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '1px solid #e2e8f0' }}>
-        <button onClick={() => setTab('overview')}
-          style={{
-            border: 'none', background: 'none', cursor: 'pointer', padding: '10px 4px', fontSize: 15,
-            fontWeight: tab === 'overview' ? 600 : 400,
-            color: tab === 'overview' ? '#1e3a8a' : '#64748b',
-            borderBottom: tab === 'overview' ? '2px solid #1e3a8a' : '2px solid transparent',
-          }}>
+        <button onClick={() => setTab('overview')} style={tabStyle(tab === 'overview')}>
           ภาพรวม
         </button>
-        <button onClick={() => setTab('packages')}
-          style={{
-            border: 'none', background: 'none', cursor: 'pointer', padding: '10px 4px', fontSize: 15,
-            fontWeight: tab === 'packages' ? 600 : 400,
-            color: tab === 'packages' ? '#1e3a8a' : '#64748b',
-            borderBottom: tab === 'packages' ? '2px solid #1e3a8a' : '2px solid transparent',
-          }}>
+        <button onClick={() => setTab('packages')} style={tabStyle(tab === 'packages')}>
           แพ็กเกจสนับสนุน ({packages.length})
         </button>
         <button onClick={() => setTab('profile')}
-          style={{
-            border: 'none', background: 'none', cursor: 'pointer', padding: '10px 4px', fontSize: 15,
-            fontWeight: tab === 'profile' ? 600 : 400,
-            color: tab === 'profile' ? '#1e3a8a' : '#64748b',
-            borderBottom: tab === 'profile' ? '2px solid #1e3a8a' : '2px solid transparent',
-            display: 'flex', alignItems: 'center', gap: 8,
-          }}>
+          style={{ ...tabStyle(tab === 'profile'), display: 'flex', alignItems: 'center', gap: 8 }}>
           โปรไฟล์กิจการ
           <span style={{
             background: info.bg, color: info.color, fontSize: 11,
@@ -148,6 +136,9 @@ export default function SmeTabs({ sme, requests, health, packages, appliedIds, m
           }}>
             ●
           </span>
+        </button>
+        <button onClick={() => setTab('settings')} style={tabStyle(tab === 'settings')}>
+          ตั้งค่า
         </button>
       </div>
       {tab === 'overview' && (
@@ -206,9 +197,9 @@ export default function SmeTabs({ sme, requests, health, packages, appliedIds, m
             สถานะข้อมูล: {info.label}
           </div>
           <ProfileForm sme={sme} />
-          <ChangePassword />
         </>
       )}
+      {tab === 'settings' && <ChangePassword />}
     </>
   )
 }
