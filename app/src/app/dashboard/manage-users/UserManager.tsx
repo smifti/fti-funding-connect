@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 const ROLE_OPTIONS: [string, string][] = [
@@ -48,7 +48,7 @@ export default function UserManager({
   const [cats, setCats] = useState<string[]>([])
   const [msg, setMsg] = useState('')
   const [saving, setSaving] = useState(false)
-  const [detail, setDetail] = useState<User | null>(null)  // ผู้ใช้ที่เปิดดูรายละเอียด
+  const [detail, setDetail] = useState<User | null>(null)
 
   function startEdit(u: User) {
     setEditing(u.id)
@@ -89,7 +89,6 @@ export default function UserManager({
   return (
     <div>
       {msg && <div className="alert alert-err" style={{ marginBottom: 12 }}>{msg}</div>}
-      {/* แท็บแยกตามบทบาท */}
       <div style={{ display: 'flex', gap: 14, marginBottom: 16, borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
         <button onClick={() => setTab('all')} style={tabStyle(tab === 'all')}>
           ทั้งหมด ({initialUsers.length})
@@ -188,7 +187,6 @@ export default function UserManager({
         )}
       </div>
 
-      {/* Modal รายละเอียดผู้ใช้ */}
       {detail && <UserDetailModal user={detail} onClose={() => setDetail(null)} />}
     </div>
   )
@@ -196,19 +194,44 @@ export default function UserManager({
 
 // ---------- Modal ----------
 function UserDetailModal({ user, onClose }: { user: User; onClose: () => void }) {
+  const supabase = createClient()
   const isAgency = user.role === 'agency'
+  const isSme = user.role === 'sme'
+  const [smeTab, setSmeTab] = useState<'business' | 'product' | 'funding' | 'contact'>('business')
+  const [sme, setSme] = useState<any>(null)
+  const [loadingSme, setLoadingSme] = useState(false)
+
+  useEffect(() => {
+    if (!isSme) return
+    setLoadingSme(true)
+    supabase.rpc('admin_get_sme_profile', { target_owner_id: user.id })
+      .then(({ data }) => {
+        setSme(Array.isArray(data) ? data[0] ?? null : data)
+        setLoadingSme(false)
+      })
+  }, [isSme, user.id])
+
   const row = (label: string, value: any) => (
     <div style={{ display: 'flex', gap: 12, padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
-      <div style={{ width: 140, flexShrink: 0, fontSize: 13, color: '#64748b' }}>{label}</div>
+      <div style={{ width: 150, flexShrink: 0, fontSize: 13, color: '#64748b' }}>{label}</div>
       <div style={{ fontSize: 14, color: '#1f2937', wordBreak: 'break-word' }}>{value || '—'}</div>
     </div>
   )
+
+  const smeTabStyle = (active: boolean) => ({
+    border: 'none', background: 'none', cursor: 'pointer',
+    padding: '8px 4px', fontSize: 13, whiteSpace: 'nowrap' as const,
+    fontWeight: active ? 600 : 400,
+    color: active ? '#1e3a8a' : '#64748b',
+    borderBottom: active ? '2px solid #1e3a8a' : '2px solid transparent',
+  })
+
   return (
     <div onClick={onClose}
       style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 1000,
         display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 20, overflowY: 'auto' }}>
       <div onClick={e => e.stopPropagation()}
-        style={{ background: '#fff', borderRadius: 14, maxWidth: 560, width: '100%',
+        style={{ background: '#fff', borderRadius: 14, maxWidth: 600, width: '100%',
           marginTop: 40, boxShadow: '0 20px 60px rgba(0,0,0,.3)', overflow: 'hidden' }}>
         {/* header */}
         <div style={{ background: '#1e3a8a', color: '#fff', padding: '16px 20px',
@@ -223,7 +246,6 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
         </div>
         {/* body */}
         <div style={{ padding: '16px 20px' }}>
-          {/* โลโก้ (ถ้าเป็นผู้ให้บริการ) */}
           {isAgency && user.agency_logo && (
             <div style={{ textAlign: 'center', marginBottom: 12 }}>
               <img src={user.agency_logo} alt="logo"
@@ -236,13 +258,13 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
           {row('บทบาท', roleLabel(user.role))}
           {row('สถานะ', user.approval_status === 'pending'
             ? 'รออนุมัติ'
-            : (user.role === 'sme' ? 'ใช้งานทั่วไป' : 'อนุมัติแล้ว'))}
+            : (isSme ? 'ใช้งานทั่วไป' : 'อนุมัติแล้ว'))}
           {user.requested_role && user.approval_status === 'pending' &&
             row('สมัครขอเป็น', roleLabel(user.requested_role))}
           {user.phone && row('เบอร์โทร', user.phone)}
           {user.created_at && row('สมัครเมื่อ', new Date(user.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }))}
 
-          {/* ข้อมูลหน่วยงาน (เฉพาะผู้ให้บริการ) */}
+          {/* ผู้ให้บริการ */}
           {isAgency && (
             <>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a', margin: '16px 0 4px' }}>ข้อมูลผู้ให้บริการ</div>
@@ -255,12 +277,74 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
             </>
           )}
 
-          {/* SME — เฟส 2 จะเพิ่มข้อมูลกิจการเต็ม */}
-          {user.role === 'sme' && (
-            <div style={{ marginTop: 16, background: '#f8fafc', borderRadius: 8, padding: 12,
-              fontSize: 13, color: '#64748b' }}>
-              ข้อมูลกิจการ SME แบบละเอียด (หลายแท็บ) จะเพิ่มในเฟสถัดไป
-            </div>
+          {/* SME — 4 แท็บ */}
+          {isSme && (
+            <>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a', margin: '16px 0 8px' }}>ข้อมูลกิจการ</div>
+              {loadingSme ? (
+                <p style={{ fontSize: 14, color: '#64748b', padding: '12px 0' }}>กำลังโหลดข้อมูล…</p>
+              ) : !sme ? (
+                <p style={{ fontSize: 14, color: '#64748b', padding: '12px 0' }}>ยังไม่มีข้อมูลกิจการ</p>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: 14, borderBottom: '1px solid #e2e8f0', marginBottom: 8, flexWrap: 'wrap' }}>
+                    <button onClick={() => setSmeTab('business')} style={smeTabStyle(smeTab === 'business')}>ข้อมูลกิจการ</button>
+                    <button onClick={() => setSmeTab('product')} style={smeTabStyle(smeTab === 'product')}>สินค้า/การตลาด</button>
+                    <button onClick={() => setSmeTab('funding')} style={smeTabStyle(smeTab === 'funding')}>ประวัติทุน</button>
+                    <button onClick={() => setSmeTab('contact')} style={smeTabStyle(smeTab === 'contact')}>ผู้ติดต่อ</button>
+                  </div>
+
+                  {smeTab === 'business' && (
+                    <>
+                      {row('ชื่อกิจการ', sme.company_name)}
+                      {row('เลขนิติบุคคล', sme.sme_one_id)}
+                      {row('เลขผู้เสียภาษี', sme.tax_id)}
+                      {row('ประเภทธุรกิจ', sme.business_type)}
+                      {row('จังหวัด', sme.province)}
+                      {row('ที่อยู่', sme.address)}
+                      {row('รหัสไปรษณีย์', sme.postal_code)}
+                      {row('ปีที่ก่อตั้ง', sme.year_started)}
+                      {row('จำนวนพนักงาน', sme.employee_count)}
+                      {row('เลขสมาชิก ส.อ.ท.', sme.fti_member_id)}
+                      {row('กลุ่มอุตสาหกรรม', sme.industry_group)}
+                      {row('ชื่อเจ้าของ', sme.owner_name)}
+                    </>
+                  )}
+                  {smeTab === 'product' && (
+                    <>
+                      {row('สินค้า/บริการหลัก', sme.main_product)}
+                      {row('แบรนด์', sme.brand)}
+                      {row('ช่องทางขาย', sme.sales_channel)}
+                      {row('เว็บไซต์', sme.website)}
+                      {row('โซเชียลมีเดีย', sme.social_media)}
+                      {row('มาตรฐานสินค้า', sme.product_standard)}
+                      {row('รางวัล', sme.awards)}
+                      {row('ประวัติส่งออก', sme.export_history)}
+                      {row('ประเทศที่ส่งออก', sme.export_countries)}
+                    </>
+                  )}
+                  {smeTab === 'funding' && (
+                    <>
+                      {row('ประวัติการรับทุน', sme.funding_history)}
+                      {row('หน่วยงานที่เคยได้รับ', sme.funding_agency)}
+                      {row('วงเงินที่เคยได้รับ', sme.funding_amount)}
+                      {row('บริการที่สนใจ', Array.isArray(sme.services_wanted) && sme.services_wanted.length > 0
+                        ? sme.services_wanted.map((c: string) => catLabel(c)).join(', ') : null)}
+                    </>
+                  )}
+                  {smeTab === 'contact' && (
+                    <>
+                      {row('ชื่อผู้ประสานงาน', sme.coordinator_name)}
+                      {row('ตำแหน่ง', sme.coordinator_position)}
+                      {row('เบอร์โทร', sme.coordinator_phone)}
+                      {row('อีเมล', sme.coordinator_email)}
+                      {row('LINE', sme.coordinator_line)}
+                      {row('ความสัมพันธ์กับกิจการ', sme.coordinator_relation)}
+                    </>
+                  )}
+                </>
+              )}
+            </>
           )}
         </div>
         {/* footer */}
