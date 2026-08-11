@@ -72,8 +72,9 @@ export default function AgencyTabs({
         <button onClick={() => setTab('profile')} style={tabStyle(tab === 'profile')}>
           โปรไฟล์หน่วยงาน
         </button>
-        <button onClick={() => setTab('settings')} style={tabStyle(tab === 'settings')}>
-          ตั้งค่า
+        <button onClick={() => setTab('settings')}
+          style={{ ...tabStyle(tab === 'settings'), marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 16 }}>⚙️</span> ตั้งค่า
         </button>
       </div>
       {tab === 'overview' && (
