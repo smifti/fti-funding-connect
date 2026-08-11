@@ -41,7 +41,7 @@ export default function AgencyTabs({
   currentUser: { id: string; name: string; role: string }
   applicantCounts: Record<string, number>
 }) {
-  const [tab, setTab] = useState<'overview' | 'packages' | 'profile' | 'sme'>('overview')
+  const [tab, setTab] = useState<'overview' | 'packages' | 'profile' | 'sme' | 'settings'>('overview')
   const [filterPkg, setFilterPkg] = useState<string | null>(null)
   const [filterPkgTitle, setFilterPkgTitle] = useState<string | null>(null)
   const cats = (profile.agency_categories ?? []) as string[]
@@ -72,6 +72,9 @@ export default function AgencyTabs({
         <button onClick={() => setTab('profile')} style={tabStyle(tab === 'profile')}>
           โปรไฟล์หน่วยงาน
         </button>
+        <button onClick={() => setTab('settings')} style={tabStyle(tab === 'settings')}>
+          ตั้งค่า
+        </button>
       </div>
       {tab === 'overview' && (
         <AgencyOverview
@@ -96,7 +99,8 @@ export default function AgencyTabs({
           applicantCounts={applicantCounts}
         />
       )}
-      {tab === 'profile' && <><AgencyProfileForm profile={profile} /><ChangePassword /></>}
+      {tab === 'profile' && <AgencyProfileForm profile={profile} />}
+      {tab === 'settings' && <ChangePassword />}
     </>
   )
 }
