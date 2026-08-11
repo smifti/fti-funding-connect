@@ -209,7 +209,8 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
   }, [isSme, user.id])
 
   // สร้าง HTML สำหรับพิมพ์ในหน้าต่างใหม่ (ไม่ซ้ำหน้าแน่นอน)
-  function doPrint() {
+  // สร้าง HTML สำหรับพิมพ์ในหน้าต่างใหม่ (ไม่ซ้ำหน้าแน่นอน)
+  function doPrint(asPdf: boolean = false) {
     const esc = (v: any) => (v === null || v === undefined || String(v).trim() === '')
       ? '—' : String(v).replace(/</g, '&lt;').replace(/>/g, '&gt;')
     const rowH = (label: string, value: any) =>
@@ -279,8 +280,11 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
         td.lbl { width: 190px; color: #64748b; }
         td.val { color: #1f2937; }
         .foot { margin-top: 24px; font-size: 11px; color: #94a3b8; text-align: center; }
-        @media print { body { padding: 0; } @page { margin: 1.5cm; } }
+        .pdf-tip { background: #fef9c3; color: #a16207; border: 1px solid #fde047;
+          border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
+        @media print { body { padding: 0; } @page { margin: 1.5cm; } .pdf-tip { display: none !important; } }
       </style></head><body>
+      ${asPdf ? `<div class="pdf-tip">💡 วิธีบันทึกเป็น PDF: ในช่อง "ปลายทาง / Destination" เลือก "บันทึกเป็น PDF / Save as PDF" แล้วกดบันทึก — เลือกโฟลเดอร์ที่ต้องการเก็บไฟล์ได้</div>` : ''}
       <div class="head">
         <h1>${esc(user.full_name || 'ไม่มีชื่อ')}</h1>
         <div class="sub">${roleLabel(user.role)} · FTI SME Funding Connect</div>
@@ -389,8 +393,8 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
         {/* footer */}
         <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9',
           display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button className="btn btn-ghost btn-sm" disabled={isSme && loadingSme} onClick={doPrint}>🖨️ พิมพ์</button>
-          <button className="btn btn-sm" disabled={isSme && loadingSme} onClick={doPrint}>📄 บันทึก PDF</button>
+          <button className="btn btn-ghost btn-sm" disabled={isSme && loadingSme} onClick={() => doPrint(false)}>🖨️ พิมพ์</button>
+          <button className="btn btn-sm" disabled={isSme && loadingSme} onClick={() => doPrint(true)}>📄 บันทึก PDF</button>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>ปิด</button>
         </div>
       </div>
