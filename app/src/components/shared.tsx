@@ -19,8 +19,8 @@ export const STATUS_LABELS: Record<string, string> = {
 }
 export const ROLE_LABELS: Record<string, string> = {
   sme: 'ผู้ประกอบการ SME',
-  agency: 'หน่วยงานสนับสนุน',
-  expert: 'ผู้ให้บริการ',
+  agency: 'ผู้ให้บริการ',
+  expert: 'ที่ปรึกษา / ผู้เชี่ยวชาญ',
   admin: 'ส.อ.ท. / ผู้ดูแลระบบ',
 }
 export function Badge({ status }: { status: string }) {
@@ -32,7 +32,6 @@ async function signOut() {
   await supabase.auth.signOut()
   redirect('/login')
 }
-
 // นับจำนวนแพ็กเกจที่รออนุมัติ (สำหรับ admin/expert)
 async function getPendingCount(): Promise<number> {
   const supabase = await createClient()
@@ -42,11 +41,9 @@ async function getPendingCount(): Promise<number> {
     .eq('approval_status', 'pending')
   return count ?? 0
 }
-
 export async function TopBar({ role }: { role: string }) {
   const isReviewer = role === 'admin' || role === 'expert'
   const pendingCount = isReviewer ? await getPendingCount() : 0
-
   return (
     <div className="topbar">
       <div className="container">
@@ -59,11 +56,11 @@ export async function TopBar({ role }: { role: string }) {
             <>
               <a href="/dashboard/manage-users" className="btn btn-ghost btn-sm"
                 style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
-                จัดการผู้ใช้งานทั้งหมด
+                👥 ผู้ใช้งานทั้งหมด
               </a>
               <a href="/dashboard/approvals" className="btn btn-ghost btn-sm"
                 style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
-                อนุมัติผู้ให้บริการ/ที่ปรึกษา
+                🏦 ผู้ให้บริการ/ที่ปรึกษา
               </a>
             </>
           )}
@@ -71,7 +68,7 @@ export async function TopBar({ role }: { role: string }) {
             <>
               <a href="/dashboard/package-approvals" className="btn btn-ghost btn-sm"
                 style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)', position: 'relative' }}>
-                อนุมัติแพ็กเกจ
+                📦 บริการ
                 {pendingCount > 0 && (
                   <span style={{
                     background: '#dc2626', color: '#fff', fontSize: 11, fontWeight: 700,
@@ -83,13 +80,13 @@ export async function TopBar({ role }: { role: string }) {
               </a>
               <a href="/dashboard/applications" className="btn btn-ghost btn-sm"
                 style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
-                จัดการใบสมัคร
+                🔍 ติดตามกิจกรรม
               </a>
             </>
           )}
           <form action={signOut}>
             <button className="btn btn-ghost btn-sm" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
-              ออกจากระบบ
+              ➡️ ออกจากระบบ
             </button>
           </form>
         </div>
