@@ -49,7 +49,6 @@ export default function UserManager({
   const [msg, setMsg] = useState('')
   const [saving, setSaving] = useState(false)
   const [detail, setDetail] = useState<User | null>(null)
-
   function startEdit(u: User) {
     setEditing(u.id)
     setRole(u.role)
@@ -186,7 +185,6 @@ export default function UserManager({
           </table>
         )}
       </div>
-
       {detail && <UserDetailModal user={detail} onClose={() => setDetail(null)} />}
     </div>
   )
@@ -200,7 +198,6 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
   const [smeTab, setSmeTab] = useState<'business' | 'product' | 'funding' | 'contact'>('business')
   const [sme, setSme] = useState<any>(null)
   const [loadingSme, setLoadingSme] = useState(false)
-
   useEffect(() => {
     if (!isSme) return
     setLoadingSme(true)
@@ -211,12 +208,96 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
       })
   }, [isSme, user.id])
 
+  // สร้าง HTML สำหรับพิมพ์ในหน้าต่างใหม่ (ไม่ซ้ำหน้าแน่นอน)
   function doPrint() {
-    window.print()
+    const esc = (v: any) => (v === null || v === undefined || String(v).trim() === '')
+      ? '—' : String(v).replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const rowH = (label: string, value: any) =>
+      `<tr><td class="lbl">${label}</td><td class="val">${esc(value)}</td></tr>`
+    const section = (title: string, rows: string) =>
+      `<h3>${title}</h3><table class="kv">${rows}</table>`
+
+    let body = ''
+    // ข้อมูลบัญชี
+    let acct = rowH('ชื่อ', user.full_name)
+      + rowH('อีเมล', user.email)
+      + rowH('บทบาท', roleLabel(user.role))
+      + rowH('สถานะ', user.approval_status === 'pending' ? 'รออนุมัติ' : (isSme ? 'ใช้งานทั่วไป' : 'อนุมัติแล้ว'))
+    if (user.requested_role && user.approval_status === 'pending') acct += rowH('สมัครขอเป็น', roleLabel(user.requested_role))
+    if (user.phone) acct += rowH('เบอร์โทร', user.phone)
+    if (user.created_at) acct += rowH('สมัครเมื่อ', new Date(user.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }))
+    body += section('ข้อมูลบัญชี', acct)
+
+    // ผู้ให้บริการ
+    if (isAgency) {
+      const a = rowH('ชื่อหน่วยงาน', user.agency_name)
+        + rowH('ด้านที่รับผิดชอบ', user.agency_categories && user.agency_categories.length > 0
+            ? user.agency_categories.map(c => catLabel(c)).join(', ') : null)
+        + rowH('อีเมลติดต่อ', user.agency_email)
+        + rowH('เว็บไซต์', user.agency_website)
+        + rowH('รายละเอียดบริการ', user.agency_description)
+      body += section('ข้อมูลผู้ให้บริการ', a)
+    }
+
+    // SME — ทุกแท็บ
+    if (isSme && sme) {
+      body += section('ข้อมูลกิจการ',
+        rowH('ชื่อกิจการ', sme.company_name) + rowH('เลขนิติบุคคล', sme.sme_one_id)
+        + rowH('เลขผู้เสียภาษี', sme.tax_id) + rowH('ประเภทธุรกิจ', sme.business_type)
+        + rowH('จังหวัด', sme.province) + rowH('ที่อยู่', sme.address)
+        + rowH('รหัสไปรษณีย์', sme.postal_code) + rowH('ปีที่ก่อตั้ง', sme.year_started)
+        + rowH('จำนวนพนักงาน', sme.employee_count) + rowH('เลขสมาชิก ส.อ.ท.', sme.fti_member_id)
+        + rowH('กลุ่มอุตสาหกรรม', sme.industry_group) + rowH('ชื่อเจ้าของ', sme.owner_name))
+      body += section('สินค้า/การตลาด',
+        rowH('สินค้า/บริการหลัก', sme.main_product) + rowH('แบรนด์', sme.brand)
+        + rowH('ช่องทางขาย', sme.sales_channel) + rowH('เว็บไซต์', sme.website)
+        + rowH('โซเชียลมีเดีย', sme.social_media) + rowH('มาตรฐานสินค้า', sme.product_standard)
+        + rowH('รางวัล', sme.awards) + rowH('ประวัติส่งออก', sme.export_history)
+        + rowH('ประเทศที่ส่งออก', sme.export_countries))
+      body += section('ประวัติทุน',
+        rowH('ประวัติการรับทุน', sme.funding_history) + rowH('หน่วยงานที่เคยได้รับ', sme.funding_agency)
+        + rowH('วงเงินที่เคยได้รับ', sme.funding_amount)
+        + rowH('บริการที่สนใจ', Array.isArray(sme.services_wanted) && sme.services_wanted.length > 0
+            ? sme.services_wanted.map((c: string) => catLabel(c)).join(', ') : null))
+      body += section('ผู้ติดต่อ',
+        rowH('ชื่อผู้ประสานงาน', sme.coordinator_name) + rowH('ตำแหน่ง', sme.coordinator_position)
+        + rowH('เบอร์โทร', sme.coordinator_phone) + rowH('อีเมล', sme.coordinator_email)
+        + rowH('LINE', sme.coordinator_line) + rowH('ความสัมพันธ์กับกิจการ', sme.coordinator_relation))
+    }
+
+    const html = `<!DOCTYPE html><html lang="th"><head><meta charset="utf-8">
+      <title>รายละเอียดผู้ใช้ - ${esc(user.full_name || user.email)}</title>
+      <style>
+        * { font-family: 'TH Sarabun New', 'Sarabun', Arial, sans-serif; box-sizing: border-box; }
+        body { margin: 0; padding: 28px; color: #1f2937; }
+        .head { border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 16px; }
+        .head h1 { margin: 0; font-size: 22px; color: #1e3a8a; }
+        .head .sub { font-size: 13px; color: #64748b; margin-top: 2px; }
+        h3 { font-size: 15px; color: #1e3a8a; margin: 18px 0 6px; border-left: 4px solid #1e3a8a; padding-left: 8px; }
+        table.kv { width: 100%; border-collapse: collapse; }
+        table.kv td { padding: 5px 8px; font-size: 13px; border-bottom: 1px solid #eef2f7; vertical-align: top; }
+        td.lbl { width: 190px; color: #64748b; }
+        td.val { color: #1f2937; }
+        .foot { margin-top: 24px; font-size: 11px; color: #94a3b8; text-align: center; }
+        @media print { body { padding: 0; } @page { margin: 1.5cm; } }
+      </style></head><body>
+      <div class="head">
+        <h1>${esc(user.full_name || 'ไม่มีชื่อ')}</h1>
+        <div class="sub">${roleLabel(user.role)} · FTI SME Funding Connect</div>
+      </div>
+      ${body}
+      <div class="foot">พิมพ์เมื่อ ${new Date().toLocaleString('th-TH')}</div>
+      <script>window.onload=function(){window.print();}</script>
+      </body></html>`
+
+    const w = window.open('', '_blank', 'width=800,height=900')
+    if (!w) { alert('เบราว์เซอร์บล็อกป๊อปอัพ กรุณาอนุญาต popup แล้วลองใหม่'); return }
+    w.document.write(html)
+    w.document.close()
   }
 
   const row = (label: string, value: any) => (
-    <div className="detail-row" style={{ display: 'flex', gap: 12, padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
+    <div style={{ display: 'flex', gap: 12, padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
       <div style={{ width: 150, flexShrink: 0, fontSize: 13, color: '#64748b' }}>{label}</div>
       <div style={{ fontSize: 14, color: '#1f2937', wordBreak: 'break-word' }}>{value || '—'}</div>
     </div>
@@ -224,7 +305,6 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
   const sectionTitle = (txt: string) => (
     <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a', margin: '16px 0 4px' }}>{txt}</div>
   )
-
   const smeTabStyle = (active: boolean) => ({
     border: 'none', background: 'none', cursor: 'pointer',
     padding: '8px 4px', fontSize: 13, whiteSpace: 'nowrap' as const,
@@ -237,25 +317,7 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
     <div onClick={onClose}
       style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 1000,
         display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 20, overflowY: 'auto' }}>
-      {/* CSS สำหรับพิมพ์ — ซ่อนทุกอย่างยกเว้นพื้นที่พิมพ์ */}
-      <style>{`
-        @media print {
-          body * { visibility: hidden !important; }
-          #user-print-area, #user-print-area * { visibility: visible !important; }
-          #user-print-area {
-            position: absolute !important; left: 0; top: 0; width: 100%;
-            margin: 0 !important; padding: 24px !important; box-shadow: none !important;
-            border-radius: 0 !important; max-width: 100% !important; margin-top: 0 !important;
-          }
-          .no-print { display: none !important; }
-          .print-only { display: block !important; }
-          .sme-print-all { display: block !important; }
-          .sme-tabbed { display: none !important; }
-        }
-        .print-only { display: none; }
-      `}</style>
-
-      <div id="user-print-area" onClick={e => e.stopPropagation()}
+      <div onClick={e => e.stopPropagation()}
         style={{ background: '#fff', borderRadius: 14, maxWidth: 600, width: '100%',
           marginTop: 40, boxShadow: '0 20px 60px rgba(0,0,0,.3)', overflow: 'hidden' }}>
         {/* header */}
@@ -265,16 +327,10 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
             <div style={{ fontSize: 18, fontWeight: 700 }}>{user.full_name || 'ไม่มีชื่อ'}</div>
             <div style={{ fontSize: 13, opacity: .85 }}>{roleLabel(user.role)}</div>
           </div>
-          <button className="no-print" onClick={onClose}
+          <button onClick={onClose}
             style={{ border: 'none', background: 'rgba(255,255,255,.2)', color: '#fff',
               width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 18 }}>✕</button>
         </div>
-
-        {/* หัวเอกสารสำหรับพิมพ์ (ขึ้นเฉพาะตอนพิมพ์) */}
-        <div className="print-only" style={{ padding: '12px 20px 0', fontSize: 12, color: '#64748b' }}>
-          FTI SME Funding Connect — รายละเอียดผู้ใช้ · พิมพ์เมื่อ {new Date().toLocaleDateString('th-TH')}
-        </div>
-
         {/* body */}
         <div style={{ padding: '16px 20px' }}>
           {isAgency && user.agency_logo && (
@@ -283,7 +339,6 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
                 style={{ maxWidth: 120, maxHeight: 120, objectFit: 'contain', borderRadius: 10, border: '1px solid #e2e8f0' }} />
             </div>
           )}
-
           {sectionTitle('ข้อมูลบัญชี')}
           {row('อีเมล', user.email)}
           {row('บทบาท', roleLabel(user.role))}
@@ -294,7 +349,6 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
             row('สมัครขอเป็น', roleLabel(user.requested_role))}
           {user.phone && row('เบอร์โทร', user.phone)}
           {user.created_at && row('สมัครเมื่อ', new Date(user.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }))}
-
           {/* ผู้ให้บริการ */}
           {isAgency && (
             <>
@@ -307,7 +361,6 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
               {row('รายละเอียดบริการ', user.agency_description)}
             </>
           )}
-
           {/* SME */}
           {isSme && (
             <>
@@ -318,42 +371,26 @@ function UserDetailModal({ user, onClose }: { user: User; onClose: () => void })
                 <p style={{ fontSize: 14, color: '#64748b', padding: '12px 0' }}>ยังไม่มีข้อมูลกิจการ</p>
               ) : (
                 <>
-                  {/* แบบแท็บ (บนจอ) */}
-                  <div className="sme-tabbed">
-                    <div className="no-print" style={{ display: 'flex', gap: 14, borderBottom: '1px solid #e2e8f0', marginBottom: 8, flexWrap: 'wrap' }}>
-                      <button onClick={() => setSmeTab('business')} style={smeTabStyle(smeTab === 'business')}>ข้อมูลกิจการ</button>
-                      <button onClick={() => setSmeTab('product')} style={smeTabStyle(smeTab === 'product')}>สินค้า/การตลาด</button>
-                      <button onClick={() => setSmeTab('funding')} style={smeTabStyle(smeTab === 'funding')}>ประวัติทุน</button>
-                      <button onClick={() => setSmeTab('contact')} style={smeTabStyle(smeTab === 'contact')}>ผู้ติดต่อ</button>
-                    </div>
-                    {smeTab === 'business' && <SmeBusiness sme={sme} row={row} />}
-                    {smeTab === 'product' && <SmeProduct sme={sme} row={row} />}
-                    {smeTab === 'funding' && <SmeFunding sme={sme} row={row} />}
-                    {smeTab === 'contact' && <SmeContact sme={sme} row={row} />}
+                  <div style={{ display: 'flex', gap: 14, borderBottom: '1px solid #e2e8f0', marginBottom: 8, flexWrap: 'wrap' }}>
+                    <button onClick={() => setSmeTab('business')} style={smeTabStyle(smeTab === 'business')}>ข้อมูลกิจการ</button>
+                    <button onClick={() => setSmeTab('product')} style={smeTabStyle(smeTab === 'product')}>สินค้า/การตลาด</button>
+                    <button onClick={() => setSmeTab('funding')} style={smeTabStyle(smeTab === 'funding')}>ประวัติทุน</button>
+                    <button onClick={() => setSmeTab('contact')} style={smeTabStyle(smeTab === 'contact')}>ผู้ติดต่อ</button>
                   </div>
-
-                  {/* แบบรวมทุกแท็บ (เฉพาะตอนพิมพ์) */}
-                  <div className="sme-print-all" style={{ display: 'none' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a', margin: '12px 0 4px' }}>ข้อมูลกิจการ</div>
-                    <SmeBusiness sme={sme} row={row} />
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a', margin: '12px 0 4px' }}>สินค้า/การตลาด</div>
-                    <SmeProduct sme={sme} row={row} />
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a', margin: '12px 0 4px' }}>ประวัติทุน</div>
-                    <SmeFunding sme={sme} row={row} />
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a', margin: '12px 0 4px' }}>ผู้ติดต่อ</div>
-                    <SmeContact sme={sme} row={row} />
-                  </div>
+                  {smeTab === 'business' && <SmeBusiness sme={sme} row={row} />}
+                  {smeTab === 'product' && <SmeProduct sme={sme} row={row} />}
+                  {smeTab === 'funding' && <SmeFunding sme={sme} row={row} />}
+                  {smeTab === 'contact' && <SmeContact sme={sme} row={row} />}
                 </>
               )}
             </>
           )}
         </div>
-
-        {/* footer — ปุ่ม (ไม่พิมพ์) */}
-        <div className="no-print" style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9',
+        {/* footer */}
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9',
           display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button className="btn btn-ghost btn-sm" onClick={doPrint}>🖨️ พิมพ์</button>
-          <button className="btn btn-sm" onClick={doPrint}>📄 บันทึก PDF</button>
+          <button className="btn btn-ghost btn-sm" disabled={isSme && loadingSme} onClick={doPrint}>🖨️ พิมพ์</button>
+          <button className="btn btn-sm" disabled={isSme && loadingSme} onClick={doPrint}>📄 บันทึก PDF</button>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>ปิด</button>
         </div>
       </div>
