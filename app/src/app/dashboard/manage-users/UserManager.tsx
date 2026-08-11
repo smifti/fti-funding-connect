@@ -107,7 +107,7 @@ export default function UserManager({
             </thead>
             <tbody>
               {shown.map((u, i) => {
-                const rowBg = i % 2 === 1 ? '#f8fafc' : '#ffffff'
+                const rowBg = i % 2 === 1 ? '#e8eef5' : '#ffffff'
                 return (
                 <tr key={u.id}>
                   <td style={{ background: rowBg }}>
