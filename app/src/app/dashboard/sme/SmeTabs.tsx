@@ -137,8 +137,9 @@ export default function SmeTabs({ sme, requests, health, packages, appliedIds, m
             ●
           </span>
         </button>
-        <button onClick={() => setTab('settings')} style={tabStyle(tab === 'settings')}>
-          ตั้งค่า
+<button onClick={() => setTab('settings')}
+          style={{ ...tabStyle(tab === 'settings'), marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 16 }}>⚙️</span> ตั้งค่า
         </button>
       </div>
       {tab === 'overview' && (
