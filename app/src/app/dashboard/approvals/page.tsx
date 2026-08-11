@@ -15,7 +15,7 @@ export default async function ApprovalsPage() {
     .single()
   if (profile?.role !== 'admin') redirect('/dashboard')
 
-  const { data: pending } = await supabase.rpc('admin_list_pending')
+  const { data: allUsers } = await supabase.rpc('admin_list_users')
 
   return (
     <>
@@ -26,7 +26,7 @@ export default async function ApprovalsPage() {
           <p className="page-sub">
             ผู้ที่สมัครเป็นผู้ให้บริการหรือที่ปรึกษา ต้องได้รับการอนุมัติจาก ส.อ.ท. ก่อนเข้าใช้งาน
           </p>
-          <ApprovalManager initialPending={pending ?? []} />
+          <ApprovalManager initialUsers={allUsers ?? []} />
         </div>
       </main>
     </>
