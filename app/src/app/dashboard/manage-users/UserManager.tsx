@@ -28,7 +28,6 @@ type User = {
   requested_role: string | null
 }
 const roleLabel = (r: string) => ROLE_OPTIONS.find(([v]) => v === r)?.[1] ?? r
-
 export default function UserManager({
   initialUsers, myId,
 }: { initialUsers: User[]; myId: string }) {
@@ -41,7 +40,6 @@ export default function UserManager({
   const [cats, setCats] = useState<string[]>([])
   const [msg, setMsg] = useState('')
   const [saving, setSaving] = useState(false)
-
   function startEdit(u: User) {
     setEditing(u.id)
     setRole(u.role)
@@ -65,15 +63,12 @@ export default function UserManager({
     setEditing(null)
     router.refresh()
   }
-
   const countByRole = (r: string) => initialUsers.filter(u => u.role === r).length
-
   let shown = initialUsers
   if (tab === 'sme') shown = initialUsers.filter(u => u.role === 'sme')
   else if (tab === 'agency') shown = initialUsers.filter(u => u.role === 'agency')
   else if (tab === 'expert') shown = initialUsers.filter(u => u.role === 'expert')
   else if (tab === 'admin') shown = initialUsers.filter(u => u.role === 'admin')
-
   const tabStyle = (active: boolean) => ({
     border: 'none', background: 'none', cursor: 'pointer',
     padding: '10px 6px', fontSize: 14, whiteSpace: 'nowrap' as const,
@@ -81,11 +76,9 @@ export default function UserManager({
     color: active ? '#1e3a8a' : '#64748b',
     borderBottom: active ? '2px solid #1e3a8a' : '2px solid transparent',
   })
-
   return (
     <div>
       {msg && <div className="alert alert-err" style={{ marginBottom: 12 }}>{msg}</div>}
-
       {/* แท็บแยกตามบทบาท */}
       <div style={{ display: 'flex', gap: 14, marginBottom: 16, borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
         <button onClick={() => setTab('all')} style={tabStyle(tab === 'all')}>
@@ -104,7 +97,6 @@ export default function UserManager({
           ผู้ดูแล ({countByRole('admin')})
         </button>
       </div>
-
       <div className="card">
         {shown.length === 0 ? (
           <p className="empty">ไม่มีผู้ใช้ในกลุ่มนี้</p>
@@ -114,13 +106,15 @@ export default function UserManager({
               <tr><th>ชื่อ / อีเมล</th><th>บทบาทปัจจุบัน</th><th>การจัดการ</th></tr>
             </thead>
             <tbody>
-              {shown.map((u, i) => (
-                <tr key={u.id} style={{ background: i % 2 === 1 ? '#f8fafc' : '#fff' }}>
-                  <td>
+              {shown.map((u, i) => {
+                const rowBg = i % 2 === 1 ? '#f8fafc' : '#ffffff'
+                return (
+                <tr key={u.id}>
+                  <td style={{ background: rowBg }}>
                     {u.full_name || '—'}
                     <div style={{ fontSize: 12, color: 'var(--muted)' }}>{u.email}</div>
                   </td>
-                  <td>
+                  <td style={{ background: rowBg }}>
                     {roleLabel(u.role)}
                     {u.approval_status === 'pending' && (
                       <span style={{ marginLeft: 6, background: '#fef9c3', color: '#a16207', fontSize: 11,
@@ -133,7 +127,7 @@ export default function UserManager({
                       </div>
                     )}
                   </td>
-                  <td>
+                  <td style={{ background: rowBg }}>
                     {editing === u.id ? (
                       <div style={{ minWidth: 280 }}>
                         <select value={role} onChange={e => setRole(e.target.value)}
@@ -173,7 +167,8 @@ export default function UserManager({
                     )}
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         )}
