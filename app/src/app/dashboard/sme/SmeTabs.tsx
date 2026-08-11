@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import ProfileForm from './ProfileForm'
 import SmePackages from './SmePackages'
-
+import ChangePassword from '@/components/ChangePassword'
 const CATEGORY_LABELS: Record<string, string> = {
   credit: 'สินเชื่อ',
   innovation: 'นวัตกรรม',
@@ -12,7 +12,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   upskill: 'Upskill / Reskill',
   other: 'อื่น ๆ (ESG)',
 }
-
 // หมุด timeline
 const STEPS = [
   { key: 'submitted', label: 'ยื่นสมัคร' },
@@ -25,7 +24,6 @@ const STATE_COLOR: Record<string, { border: string; bg: string; fg: string }> = 
   passed: { border: '#16a34a', bg: '#16a34a', fg: '#fff' },
   failed: { border: '#dc2626', bg: '#dc2626', fg: '#fff' },
 }
-
 // ป้ายสถานะแพ็กเกจ (คำนวณจาก approval_status + service_status)
 function packageStatusBadge(pkg: any): { label: string; bg: string; color: string } | null {
   if (!pkg) return null
@@ -54,22 +52,18 @@ const OPTIONAL_FIELDS = [
   'funding_history', 'funding_agency', 'funding_amount',
   'coordinator_position', 'coordinator_line', 'coordinator_relation',
 ]
-
 function filled(v: any) { return v !== null && v !== undefined && String(v).trim() !== '' }
-
 function getStatus(sme: any): 'green' | 'yellow' | 'red' {
   const reqOk = REQUIRED_FIELDS.every(f => filled(sme[f]))
   if (!reqOk) return 'red'
   const optOk = OPTIONAL_FIELDS.every(f => filled(sme[f]))
   return optOk ? 'green' : 'yellow'
 }
-
 const STATUS_INFO = {
   green: { color: '#16a34a', bg: '#dcfce7', label: 'ข้อมูลครบถ้วน' },
   yellow: { color: '#a16207', bg: '#fef9c3', label: 'ข้อมูลจำเป็นครบ (เพิ่มเติมได้)' },
   red: { color: '#dc2626', bg: '#fee2e2', label: 'ข้อมูลจำเป็นยังไม่ครบ' },
 }
-
 // Timeline สำหรับ SME (อ่านอย่างเดียว)
 function AppTimeline({ steps }: { steps: Record<string, any> }) {
   const s = steps ?? {}
@@ -110,19 +104,16 @@ function AppTimeline({ steps }: { steps: Record<string, any> }) {
     </div>
   )
 }
-
 export default function SmeTabs({ sme, requests, health, packages, appliedIds, myApplications }: { sme: any; requests: any[]; health: any; packages: any[]; appliedIds: string[]; myApplications: any[] }) {
   const [tab, setTab] = useState<'overview' | 'packages' | 'profile'>('overview')
   const status = getStatus(sme)
   const info = STATUS_INFO[status]
-
   return (
     <>
       <h1 className="page-title">{sme.company_name}</h1>
       <p className="page-sub">
         {sme.sme_one_id ? `เลขนิติบุคคล: ${sme.sme_one_id} · ` : ''}{sme.province ?? '—'}
       </p>
-
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '1px solid #e2e8f0' }}>
         <button onClick={() => setTab('overview')}
           style={{
@@ -159,7 +150,6 @@ export default function SmeTabs({ sme, requests, health, packages, appliedIds, m
           </span>
         </button>
       </div>
-
       {tab === 'overview' && (
         <>
           <div className="grid grid-2">
@@ -204,11 +194,9 @@ export default function SmeTabs({ sme, requests, health, packages, appliedIds, m
           </div>
         </>
       )}
-
       {tab === 'packages' && (
         <SmePackages smeId={sme.id} packages={packages} appliedIds={appliedIds} />
       )}
-
       {tab === 'profile' && (
         <>
           <div style={{
@@ -218,12 +206,12 @@ export default function SmeTabs({ sme, requests, health, packages, appliedIds, m
             สถานะข้อมูล: {info.label}
           </div>
           <ProfileForm sme={sme} />
+          <ChangePassword />
         </>
       )}
     </>
   )
 }
-
 function HealthView({ h }: { h: any }) {
   const rows = [
     ['การเงิน', h.score_finance],
