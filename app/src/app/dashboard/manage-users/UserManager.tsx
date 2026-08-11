@@ -26,8 +26,16 @@ type User = {
   agency_categories: string[] | null
   approval_status: string | null
   requested_role: string | null
+  phone: string | null
+  agency_email: string | null
+  agency_website: string | null
+  agency_description: string | null
+  agency_logo: string | null
+  created_at: string | null
 }
 const roleLabel = (r: string) => ROLE_OPTIONS.find(([v]) => v === r)?.[1] ?? r
+const catLabel = (c: string) => CATEGORY_OPTIONS.find(([v]) => v === c)?.[1] ?? c
+
 export default function UserManager({
   initialUsers, myId,
 }: { initialUsers: User[]; myId: string }) {
@@ -40,6 +48,8 @@ export default function UserManager({
   const [cats, setCats] = useState<string[]>([])
   const [msg, setMsg] = useState('')
   const [saving, setSaving] = useState(false)
+  const [detail, setDetail] = useState<User | null>(null)  // ผู้ใช้ที่เปิดดูรายละเอียด
+
   function startEdit(u: User) {
     setEditing(u.id)
     setRole(u.role)
@@ -111,7 +121,11 @@ export default function UserManager({
                 return (
                 <tr key={u.id}>
                   <td style={{ background: rowBg }}>
-                    {u.full_name || '—'}
+                    <button onClick={() => setDetail(u)}
+                      style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer',
+                        textAlign: 'left', color: '#1e3a8a', fontWeight: 600, fontSize: 'inherit' }}>
+                      {u.full_name || '—'}
+                    </button>
                     <div style={{ fontSize: 12, color: 'var(--muted)' }}>{u.email}</div>
                   </td>
                   <td style={{ background: rowBg }}>
@@ -122,8 +136,7 @@ export default function UserManager({
                     )}
                     {u.role === 'agency' && u.agency_categories && u.agency_categories.length > 0 && (
                       <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                        {u.agency_name} · {u.agency_categories.map(c =>
-                          CATEGORY_OPTIONS.find(([v]) => v === c)?.[1]).join(', ')}
+                        {u.agency_name} · {u.agency_categories.map(c => catLabel(c)).join(', ')}
                       </div>
                     )}
                   </td>
@@ -157,13 +170,14 @@ export default function UserManager({
                         </div>
                       </div>
                     ) : (
-                      u.id === myId ? (
-                        <span style={{ fontSize: 13, color: 'var(--muted)' }}>บัญชีของคุณ</span>
-                      ) : (
-                        <button className="btn btn-ghost btn-sm" onClick={() => startEdit(u)}>
-                          เปลี่ยนสิทธิ์
-                        </button>
-                      )
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setDetail(u)}>ดูรายละเอียด</button>
+                        {u.id === myId ? (
+                          <span style={{ fontSize: 13, color: 'var(--muted)', alignSelf: 'center' }}>บัญชีของคุณ</span>
+                        ) : (
+                          <button className="btn btn-ghost btn-sm" onClick={() => startEdit(u)}>เปลี่ยนสิทธิ์</button>
+                        )}
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -172,6 +186,87 @@ export default function UserManager({
             </tbody>
           </table>
         )}
+      </div>
+
+      {/* Modal รายละเอียดผู้ใช้ */}
+      {detail && <UserDetailModal user={detail} onClose={() => setDetail(null)} />}
+    </div>
+  )
+}
+
+// ---------- Modal ----------
+function UserDetailModal({ user, onClose }: { user: User; onClose: () => void }) {
+  const isAgency = user.role === 'agency'
+  const row = (label: string, value: any) => (
+    <div style={{ display: 'flex', gap: 12, padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
+      <div style={{ width: 140, flexShrink: 0, fontSize: 13, color: '#64748b' }}>{label}</div>
+      <div style={{ fontSize: 14, color: '#1f2937', wordBreak: 'break-word' }}>{value || '—'}</div>
+    </div>
+  )
+  return (
+    <div onClick={onClose}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 1000,
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 20, overflowY: 'auto' }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ background: '#fff', borderRadius: 14, maxWidth: 560, width: '100%',
+          marginTop: 40, boxShadow: '0 20px 60px rgba(0,0,0,.3)', overflow: 'hidden' }}>
+        {/* header */}
+        <div style={{ background: '#1e3a8a', color: '#fff', padding: '16px 20px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>{user.full_name || 'ไม่มีชื่อ'}</div>
+            <div style={{ fontSize: 13, opacity: .85 }}>{roleLabel(user.role)}</div>
+          </div>
+          <button onClick={onClose}
+            style={{ border: 'none', background: 'rgba(255,255,255,.2)', color: '#fff',
+              width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 18 }}>✕</button>
+        </div>
+        {/* body */}
+        <div style={{ padding: '16px 20px' }}>
+          {/* โลโก้ (ถ้าเป็นผู้ให้บริการ) */}
+          {isAgency && user.agency_logo && (
+            <div style={{ textAlign: 'center', marginBottom: 12 }}>
+              <img src={user.agency_logo} alt="logo"
+                style={{ maxWidth: 120, maxHeight: 120, objectFit: 'contain', borderRadius: 10, border: '1px solid #e2e8f0' }} />
+            </div>
+          )}
+
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a', marginBottom: 4 }}>ข้อมูลบัญชี</div>
+          {row('อีเมล', user.email)}
+          {row('บทบาท', roleLabel(user.role))}
+          {row('สถานะ', user.approval_status === 'pending'
+            ? 'รออนุมัติ'
+            : (user.role === 'sme' ? 'ใช้งานทั่วไป' : 'อนุมัติแล้ว'))}
+          {user.requested_role && user.approval_status === 'pending' &&
+            row('สมัครขอเป็น', roleLabel(user.requested_role))}
+          {user.phone && row('เบอร์โทร', user.phone)}
+          {user.created_at && row('สมัครเมื่อ', new Date(user.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }))}
+
+          {/* ข้อมูลหน่วยงาน (เฉพาะผู้ให้บริการ) */}
+          {isAgency && (
+            <>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a', margin: '16px 0 4px' }}>ข้อมูลผู้ให้บริการ</div>
+              {row('ชื่อหน่วยงาน', user.agency_name)}
+              {row('ด้านที่รับผิดชอบ', user.agency_categories && user.agency_categories.length > 0
+                ? user.agency_categories.map(c => catLabel(c)).join(', ') : null)}
+              {row('อีเมลติดต่อ', user.agency_email)}
+              {row('เว็บไซต์', user.agency_website)}
+              {row('รายละเอียดบริการ', user.agency_description)}
+            </>
+          )}
+
+          {/* SME — เฟส 2 จะเพิ่มข้อมูลกิจการเต็ม */}
+          {user.role === 'sme' && (
+            <div style={{ marginTop: 16, background: '#f8fafc', borderRadius: 8, padding: 12,
+              fontSize: 13, color: '#64748b' }}>
+              ข้อมูลกิจการ SME แบบละเอียด (หลายแท็บ) จะเพิ่มในเฟสถัดไป
+            </div>
+          )}
+        </div>
+        {/* footer */}
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', textAlign: 'right' }}>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>ปิด</button>
+        </div>
       </div>
     </div>
   )
