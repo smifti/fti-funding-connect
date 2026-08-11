@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 const ROLE_OPTIONS: [string, string][] = [
   ['sme', 'ผู้ประกอบการ SME'],
-  ['agency', 'หน่วยงานสนับสนุน'],
+  ['agency', 'ผู้ให้บริการ'],
   ['expert', 'ที่ปรึกษา / ผู้เชี่ยวชาญ'],
   ['admin', 'ผู้ดูแลระบบ (ส.อ.ท.)'],
 ]
@@ -95,10 +95,10 @@ export default function UserManager({
           SME ({countByRole('sme')})
         </button>
         <button onClick={() => setTab('agency')} style={tabStyle(tab === 'agency')}>
-          หน่วยงาน ({countByRole('agency')})
+          ผู้ให้บริการ ({countByRole('agency')})
         </button>
         <button onClick={() => setTab('expert')} style={tabStyle(tab === 'expert')}>
-          ที่ปรึกษา ({countByRole('expert')})
+          ที่ปรึกษา/ผู้เชี่ยวชาญ ({countByRole('expert')})
         </button>
         <button onClick={() => setTab('admin')} style={tabStyle(tab === 'admin')}>
           ผู้ดูแล ({countByRole('admin')})
@@ -114,8 +114,8 @@ export default function UserManager({
               <tr><th>ชื่อ / อีเมล</th><th>บทบาทปัจจุบัน</th><th>การจัดการ</th></tr>
             </thead>
             <tbody>
-              {shown.map(u => (
-                <tr key={u.id}>
+              {shown.map((u, i) => (
+                <tr key={u.id} style={{ background: i % 2 === 1 ? '#f8fafc' : '#fff' }}>
                   <td>
                     {u.full_name || '—'}
                     <div style={{ fontSize: 12, color: 'var(--muted)' }}>{u.email}</div>
