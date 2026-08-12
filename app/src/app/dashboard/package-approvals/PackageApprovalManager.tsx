@@ -2,14 +2,13 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
+import PackageDetailModal from '../shared-packages/PackageDetailModal'
 
-const CATEGORY_LABELS: Record<string, string> = {
-  credit: 'สินเชื่อ', innovation: 'นวัตกรรม', management: 'บริหารจัดการ',
-  marketing: 'การตลาด', production: 'การผลิต', upskill: 'Upskill / Reskill',
-  other: 'อื่น ๆ (ESG)',
-}
-const TEMPLATE_LABELS: Record<string, string> = {
-  loan: 'สินเชื่อ', grant: 'หน่วยงานให้ทุน / บริการอื่น ๆ',
+type ImageMeta = {
+  url: string
+  filename: string
+  size: number | null
+  uploaded_at: string | null
 }
 
 type Pkg = {
@@ -26,13 +25,32 @@ type Pkg = {
   target_industry: string | null
   open_period: string | null
   image_url: string | null
-  approval_status: string | null
+  approval_status: string
+  is_active: boolean
+  service_status: string
+  package_type: string | null
+  related_sectors: string[] | null
+  min_amount: number | null
+  max_amount: number | null
+  eligibility_criteria: string | null
+  loan_term: string | null
+  collateral_required: string | null
+  collateral_detail: string | null
+  cover_banner: ImageMeta | null
+  cover_square: ImageMeta | null
+  detail_images: ImageMeta[] | null
+  package_rate_structures?: any | null
   profiles: { agency_name: string | null; full_name: string | null } | null
 }
 
 type TabKey = 'pending' | 'approved' | 'rejected'
 
-export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) {
+export default function PackageApprovalManager({
+  initial, applicantCounts,
+}: {
+  initial: Pkg[]
+  applicantCounts: Record<string, number>
+}) {
   const router = useRouter()
   const supabase = createClient()
   const [busy, setBusy] = useState<string | null>(null)
@@ -214,64 +232,14 @@ export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) 
         )
       )}
 
-      {/* Modal รายละเอียดบริการ */}
+      {/* Modal รายละเอียดบริการ — ใช้ pattern เดียวกับฝั่ง agency */}
       {detail && (
-        <div onClick={() => setDetail(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 1000,
-            display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 20, overflowY: 'auto' }}>
-          <div onClick={e => e.stopPropagation()}
-            style={{ background: '#fff', borderRadius: 14, maxWidth: 620, width: '100%',
-              marginTop: 40, boxShadow: '0 20px 60px rgba(0,0,0,.3)', overflow: 'hidden' }}>
-            <div style={{ background: '#1e3a8a', color: '#fff', padding: '16px 20px',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: 18, fontWeight: 700 }}>รายละเอียดบริการ</div>
-              <button onClick={() => setDetail(null)}
-                style={{ border: 'none', background: 'rgba(255,255,255,.2)', color: '#fff',
-                  width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 18 }}>✕</button>
-            </div>
-            <div style={{ padding: '16px 20px' }}>
-              <PkgDetail p={detail} />
-            </div>
-            <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', textAlign: 'right' }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setDetail(null)}>ปิด</button>
-            </div>
-          </div>
-        </div>
+        <PackageDetailModal
+          pkg={detail}
+          applicantCount={applicantCounts[detail.id] ?? 0}
+          onClose={() => setDetail(null)}
+        />
       )}
-    </div>
-  )
-}
-
-// รายละเอียดบริการเต็ม
-function PkgDetail({ p }: { p: Pkg }) {
-  return (
-    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-      {p.image_url && (
-        <img src={p.image_url} alt="" style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />
-      )}
-      <div style={{ flex: 1 }}>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-          <span style={{ background: '#e0e7ff', color: '#3730a3', fontSize: 12, padding: '2px 10px', borderRadius: 10 }}>
-            {TEMPLATE_LABELS[p.template_type] ?? p.template_type}
-          </span>
-          <span style={{ background: '#f1f5f9', color: '#475569', fontSize: 12, padding: '2px 10px', borderRadius: 10 }}>
-            {CATEGORY_LABELS[p.category] ?? p.category}
-          </span>
-        </div>
-        <h2 style={{ margin: '0 0 4px' }}>{p.title}</h2>
-        <div style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>
-          โดย: {p.profiles?.agency_name || p.profiles?.full_name || '—'}
-        </div>
-        {p.description && <p style={{ fontSize: 14, margin: '0 0 8px' }}>{p.description}</p>}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 13, color: '#475569' }}>
-          {p.price_amount != null && <div><strong>วงเงิน:</strong> {p.price_amount.toLocaleString('th-TH')} บาท {p.price_note}</div>}
-          {p.funding_type && <div><strong>รูปแบบทุน:</strong> {p.funding_type}</div>}
-          {p.support_items && <div><strong>สิ่งที่สนับสนุน:</strong> {p.support_items}</div>}
-          {p.target_sme && <div><strong>SME ที่เหมาะ:</strong> {p.target_sme}</div>}
-          {p.target_industry && <div><strong>อุตสาหกรรม:</strong> {p.target_industry}</div>}
-          {p.open_period && <div><strong>เปิดรับ:</strong> {p.open_period}</div>}
-        </div>
-      </div>
     </div>
   )
 }
