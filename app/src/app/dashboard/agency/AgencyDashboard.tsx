@@ -30,7 +30,8 @@ export default async function AgencyDashboard({ userId }: { userId: string }) {
       funding_type, support_items, target_sme, target_industry, open_period,
       image_url, approval_status, is_active, service_status,
       package_type, related_sectors, min_amount, max_amount, eligibility_criteria,
-      loan_term, collateral_required, collateral_detail, detail_images,
+      loan_term, collateral_required, collateral_detail,
+      cover_banner, cover_square, detail_images,
       package_rate_structures(*)
     `)
     .eq('owner_id', userId)
