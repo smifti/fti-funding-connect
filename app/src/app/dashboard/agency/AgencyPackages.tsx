@@ -3,11 +3,16 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 
-const CATEGORY_LABELS: Record<string, string> = {
-  credit: 'สินเชื่อ', innovation: 'นวัตกรรม', management: 'บริหารจัดการ',
-  marketing: 'การตลาด', production: 'การผลิต', upskill: 'Upskill / Reskill',
-  other: 'อื่น ๆ (ESG)',
-}
+// หมวดหมู่ข้อเสนอ/บริการ (ค่าที่เก็บใน DB = ค่าเดียวกับ label ที่แสดง เพราะ category เป็น text ธรรมดา)
+const CATEGORY_OPTIONS = [
+  'การเงิน/ธนาคาร',
+  'นวัตกรรม/เทคโนโลยี',
+  'ดิจิทัล',
+  'การเพิ่มผลิตภาพ / การยกระดับผลิตภาพ (Productivity)',
+  'การตลาด',
+  'สิ่งแวดล้อม',
+  'อื่นๆ',
+]
 const APPROVAL_LABELS: Record<string, { text: string; bg: string; color: string }> = {
   pending: { text: 'รออนุมัติ', bg: '#fef9c3', color: '#a16207' },
   approved: { text: 'อนุมัติแล้ว', bg: '#dcfce7', color: '#166534' },
@@ -23,7 +28,7 @@ const SERVICE_LABELS: Record<string, string> = {
   ended: '⚫ สิ้นสุดโครงการ',
 }
 
-// ประเภทแพ็กเกจใหม่ (แยกจาก template_type เดิม)
+// ประเภทข้อเสนอ/บริการ (แยกจาก template_type เดิม — template_type จะถูก auto-set ตามนี้เบื้องหลัง ไม่แสดงใน UI แล้ว)
 const PACKAGE_TYPE_OPTIONS = ['สินเชื่อ', 'ทุนเต็มจำนวน', 'ทุนบางส่วน', 'อื่นๆ']
 
 // ประเภทสินเชื่อ 7 ข้อ (ใช้เมื่อ package_type = สินเชื่อ)
@@ -71,7 +76,7 @@ type Pkg = {
 
 const EMPTY_FORM = {
   template_type: 'grant',
-  category: 'credit',
+  category: '',
   title: '',
   description: '',
   price_amount: '',
@@ -107,7 +112,7 @@ export default function AgencyPackages({
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
-  const [form, setForm] = useState({ ...EMPTY_FORM, category: categories[0] ?? 'credit' })
+  const [form, setForm] = useState({ ...EMPTY_FORM })
 
   // ด้านที่เกี่ยวข้อง / ประเภทสินเชื่อ (tag สะสม)
   const [sectorTags, setSectorTags] = useState<string[]>([])
@@ -120,7 +125,7 @@ export default function AgencyPackages({
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
 
   function resetForm() {
-    setForm({ ...EMPTY_FORM, category: categories[0] ?? 'credit' })
+    setForm({ ...EMPTY_FORM })
     setImageFile(null)
     setEditId(null)
     setSectorTags([])
@@ -139,15 +144,15 @@ export default function AgencyPackages({
     const count = applicantCounts[p.id] ?? 0
     if (count > 0) {
       const ok = confirm(
-        `แพ็กเกจนี้มีผู้สมัครแล้ว ${count} ราย\n\n` +
-        `การแก้ไขจะกระทบข้อมูลที่ผู้สมัครเห็น และแพ็กเกจจะกลับไปสถานะ "รออนุมัติ" ` +
+        `ข้อเสนอ/บริการนี้มีผู้สมัครแล้ว ${count} ราย\n\n` +
+        `การแก้ไขจะกระทบข้อมูลที่ผู้สมัครเห็น และข้อเสนอ/บริการจะกลับไปสถานะ "รออนุมัติ" ` +
         `(หายจากหน้า SME ชั่วคราวจนกว่าจะอนุมัติใหม่)\n\nต้องการดำเนินการต่อหรือไม่?`
       )
       if (!ok) return
     }
     setForm({
       template_type: p.template_type ?? 'grant',
-      category: p.category ?? 'credit',
+      category: p.category ?? '',
       title: p.title ?? '',
       description: p.description ?? '',
       price_amount: p.price_amount != null ? String(p.price_amount) : '',
@@ -202,7 +207,7 @@ export default function AgencyPackages({
   }
 
   async function save() {
-    if (!form.title.trim()) { setMsg('กรุณาระบุชื่อแพ็กเกจ'); return }
+    if (!form.title.trim()) { setMsg('กรุณาระบุชื่อข้อเสนอ/บริการ'); return }
     setBusy(true); setMsg('')
 
     // อัปโหลด thumbnail (ถ้ามีการเปลี่ยน)
@@ -235,10 +240,13 @@ export default function AgencyPackages({
     const finalDetailImages = [...existingDetailImages, ...uploadedDetailUrls]
 
     const isLoan = form.package_type === 'สินเชื่อ'
+    // auto-set template_type ตาม package_type (ไม่แสดง dropdown นี้ใน UI แล้ว แต่ยังต้องเก็บค่าให้ถูกต้อง
+    // เพราะจุดอื่นในระบบ เช่น การแสดงผล/รายงาน อาจยังอิงคอลัมน์นี้อยู่)
+    const autoTemplateType = isLoan ? 'loan' : 'grant'
 
     const payload: any = {
-      template_type: form.template_type,
-      category: form.category,
+      template_type: autoTemplateType,
+      category: form.category.trim(),
       title: form.title.trim(),
       description: form.description.trim() || null,
       price_amount: form.price_amount ? Number(form.price_amount) : null,
@@ -290,8 +298,8 @@ export default function AgencyPackages({
   async function remove(id: string) {
     const count = applicantCounts[id] ?? 0
     const warn = count > 0
-      ? `แพ็กเกจนี้มีผู้สมัครแล้ว ${count} ราย การลบจะลบใบสมัครทั้งหมดด้วย\n\nยืนยันลบ?`
-      : 'ต้องการลบแพ็กเกจนี้ใช่หรือไม่?'
+      ? `ข้อเสนอ/บริการนี้มีผู้สมัครแล้ว ${count} ราย การลบจะลบใบสมัครทั้งหมดด้วย\n\nยืนยันลบ?`
+      : 'ต้องการลบข้อเสนอ/บริการนี้ใช่หรือไม่?'
     if (!confirm(warn)) return
     setBusy(true)
     await supabase.from('packages').delete().eq('id', id)
@@ -311,9 +319,9 @@ export default function AgencyPackages({
   return (
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ margin: 0 }}>แพ็กเกจของฉัน ({initial.length})</h2>
+        <h2 style={{ margin: 0 }}>ข้อเสนอ/บริการของฉัน ({initial.length})</h2>
         <button className="btn btn-sm" onClick={() => showForm ? (setShowForm(false), resetForm()) : openCreate()}>
-          {showForm ? 'ปิดฟอร์ม' : '+ สร้างแพ็กเกจใหม่'}
+          {showForm ? 'ปิดฟอร์ม' : '+ สร้างข้อเสนอ/บริการใหม่'}
         </button>
       </div>
 
@@ -327,31 +335,36 @@ export default function AgencyPackages({
           padding: 16, marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {editId && (
             <div style={{ background: '#fef9c3', color: '#a16207', padding: '8px 12px', borderRadius: 8, fontSize: 13 }}>
-              กำลังแก้ไขแพ็กเกจ — เมื่อบันทึกแล้วจะกลับไปสถานะ "รออนุมัติ"
+              กำลังแก้ไขข้อเสนอ/บริการ — เมื่อบันทึกแล้วจะกลับไปสถานะ "รออนุมัติ"
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>ประเภทแพ็กเกจ (เดิม)</label>
-              <select style={fieldStyle} value={form.template_type} onChange={e => set('template_type', e.target.value)}>
-                <option value="grant">หน่วยงานให้ทุน / บริการอื่น ๆ</option>
-                <option value="loan">สินเชื่อ</option>
-              </select>
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>หมวดหมู่ (เดิม)</label>
-              <select style={fieldStyle} value={form.category} onChange={e => set('category', e.target.value)}>
-                {categories.map(c => (
-                  <option key={c} value={c}>{CATEGORY_LABELS[c] ?? c}</option>
-                ))}
-              </select>
-            </div>
+          {/* หมวดหมู่ข้อเสนอ/บริการ */}
+          <div>
+            <label style={labelStyle}>หมวดหมู่ข้อเสนอ/บริการ *</label>
+            <select
+              style={fieldStyle}
+              value={CATEGORY_OPTIONS.includes(form.category) ? form.category : (form.category ? 'อื่นๆ' : '')}
+              onChange={e => {
+                const v = e.target.value
+                set('category', v === 'อื่นๆ' ? '' : v)
+              }}>
+              <option value="">-- เลือกหมวดหมู่ข้อเสนอ/บริการ --</option>
+              {CATEGORY_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+            {(form.category === '' || !CATEGORY_OPTIONS.includes(form.category)) && (
+              <input
+                style={{ ...fieldStyle, marginTop: 6 }}
+                placeholder="ระบุหมวดหมู่ (กรณีเลือก อื่นๆ)"
+                value={CATEGORY_OPTIONS.includes(form.category) ? '' : form.category}
+                onChange={e => set('category', e.target.value)}
+              />
+            )}
           </div>
 
-          {/* ประเภทแพ็กเกจใหม่ */}
+          {/* ประเภทข้อเสนอ/บริการ */}
           <div>
-            <label style={labelStyle}>ประเภทแพ็กเกจ *</label>
+            <label style={labelStyle}>ประเภทข้อเสนอ/บริการ *</label>
             <select
               style={fieldStyle}
               value={PACKAGE_TYPE_OPTIONS.includes(form.package_type) ? form.package_type : (form.package_type ? 'อื่นๆ' : '')}
@@ -361,13 +374,13 @@ export default function AgencyPackages({
                 setSectorTags([]) // เปลี่ยนประเภท ล้าง tag เดิมเพื่อไม่ให้ปนกัน
                 setSectorPick('')
               }}>
-              <option value="">-- เลือกประเภทแพ็กเกจ --</option>
+              <option value="">-- เลือกประเภทข้อเสนอ/บริการ --</option>
               {PACKAGE_TYPE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
             {(form.package_type === '' || !PACKAGE_TYPE_OPTIONS.includes(form.package_type)) && (
               <input
                 style={{ ...fieldStyle, marginTop: 6 }}
-                placeholder="ระบุประเภทแพ็กเกจ (กรณีเลือก อื่นๆ)"
+                placeholder="ระบุประเภทข้อเสนอ/บริการ (กรณีเลือก อื่นๆ)"
                 value={PACKAGE_TYPE_OPTIONS.includes(form.package_type) ? '' : form.package_type}
                 onChange={e => set('package_type', e.target.value)}
               />
@@ -375,7 +388,7 @@ export default function AgencyPackages({
           </div>
 
           <div>
-            <label style={labelStyle}>ชื่อแพ็กเกจ / โครงการ *</label>
+            <label style={labelStyle}>ชื่อข้อเสนอ/บริการ / โครงการ *</label>
             <input style={fieldStyle} value={form.title} onChange={e => set('title', e.target.value)}
               placeholder="เช่น สินเชื่อ SME ดอกเบี้ยพิเศษ / โครงการสนับสนุน Digital" />
           </div>
@@ -582,21 +595,21 @@ export default function AgencyPackages({
 
           <div>
             <button className="btn" disabled={busy} onClick={save}>
-              {busy ? 'กำลังบันทึก…' : (editId ? 'บันทึกการแก้ไข' : 'บันทึกแพ็กเกจ')}
+              {busy ? 'กำลังบันทึก…' : (editId ? 'บันทึกการแก้ไข' : 'บันทึกข้อเสนอ/บริการ')}
             </button>
           </div>
           <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>
-            * แพ็กเกจจะอยู่สถานะ "รออนุมัติ" จนกว่า ส.อ.ท. จะอนุมัติ จึงจะแสดงให้ SME เห็น
+            * ข้อเสนอ/บริการจะอยู่สถานะ "รออนุมัติ" จนกว่า ส.อ.ท. จะอนุมัติ จึงจะแสดงให้ SME เห็น
           </p>
         </div>
       )}
 
       {initial.length === 0 ? (
-        <p className="empty" style={{ marginTop: 16 }}>ยังไม่มีแพ็กเกจ — กด "สร้างแพ็กเกจใหม่" เพื่อเริ่ม</p>
+        <p className="empty" style={{ marginTop: 16 }}>ยังไม่มีข้อเสนอ/บริการ — กด "สร้างข้อเสนอ/บริการใหม่" เพื่อเริ่ม</p>
       ) : (
         <table style={{ marginTop: 16 }}>
           <thead>
-            <tr><th>แพ็กเกจ</th><th>ประเภท</th><th>ผู้สมัคร</th><th>วงเงิน</th><th>สถานะ</th><th>จัดการ</th></tr>
+            <tr><th>ข้อเสนอ/บริการ</th><th>ประเภท</th><th>ผู้สมัคร</th><th>วงเงิน</th><th>สถานะ</th><th>จัดการ</th></tr>
           </thead>
           <tbody>
             {initial.map(p => {
@@ -612,7 +625,7 @@ export default function AgencyPackages({
                       <div>
                         {p.title}
                         <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                          {CATEGORY_LABELS[p.category] ?? p.category} · {TEMPLATE_LABELS[p.template_type] ?? p.template_type}
+                          {p.category || '—'}
                           {p.package_type && <> · {p.package_type}</>}
                         </div>
                       </div>
