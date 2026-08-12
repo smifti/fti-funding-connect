@@ -51,6 +51,8 @@ type Group = {
 
 const STATE_COLOR = {
   pending: { border: '#cbd5e1', bg: '#fff', fg: '#94a3b8' },
+  // pending แต่ผ่านหมุดก่อนหน้ามาแล้ว = กดได้ตอนนี้ (active) → เหลือง แทนที่จะเป็นขาวเฉยๆ
+  active: { border: '#eab308', bg: '#eab308', fg: '#fff' },
   passed: { border: '#16a34a', bg: '#16a34a', fg: '#fff' },
   failed: { border: '#dc2626', bg: '#dc2626', fg: '#fff' },
 }
@@ -235,9 +237,12 @@ export default function AgencyApplicants({
                     <div style={{ display: 'flex', alignItems: 'flex-start', position: 'relative' }}>
                       {STEPS.map((step, i) => {
                         const st = steps[step.key]?.state ?? 'pending'
-                        const c = STATE_COLOR[st]
                         const open = isStepOpen(steps, i)
                         const clickable = open && busy !== a.id
+                        // หมุดที่ยังไม่กำหนดสถานะ (pending) แต่ผ่านหมุดก่อนหน้ามาแล้ว = กดได้ตอนนี้ → แสดงสีเหลือง (active)
+                        // ไม่ใช้สีขาวเฉยๆ เพราะจุดนี้เป็นจุดที่ต้องกดกำหนดสถานะต่อไป
+                        const colorKey = st === 'pending' && open ? 'active' : st
+                        const c = STATE_COLOR[colorKey]
                         return (
                           <div key={step.key} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
                             {i > 0 && (
@@ -260,8 +265,8 @@ export default function AgencyApplicants({
                               {st === 'passed' ? '✓' : st === 'failed' ? '✕' : i + 1}
                             </button>
                             <div style={{ fontSize: 12, marginTop: 6,
-                              color: st === 'passed' ? '#16a34a' : st === 'failed' ? '#dc2626' : '#94a3b8',
-                              fontWeight: st !== 'pending' ? 600 : 400 }}>
+                              color: st === 'passed' ? '#16a34a' : st === 'failed' ? '#dc2626' : (open ? '#ca8a04' : '#94a3b8'),
+                              fontWeight: st !== 'pending' ? 600 : (open ? 600 : 400) }}>
                               {step.label}
                             </div>
                             {st === 'failed' && steps[step.key]?.note && (
