@@ -86,9 +86,69 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
+// Lightbox — แสดงรูปขนาดจริง ซ้อนทับเต็มจอ พื้นหลังมืด เลื่อนดูรูปอื่นในชุดได้
+function Lightbox({
+  images, startIndex, onClose,
+}: {
+  images: string[]
+  startIndex: number
+  onClose: () => void
+}) {
+  const [idx, setIdx] = useState(startIndex)
+
+  function prev(e?: React.MouseEvent) { e?.stopPropagation(); setIdx(i => (i === 0 ? images.length - 1 : i - 1)) }
+  function next(e?: React.MouseEvent) { e?.stopPropagation(); setIdx(i => (i === images.length - 1 ? 0 : i + 1)) }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 300, padding: 24,
+      }}>
+      <button onClick={onClose} aria-label="ปิด" style={{
+        position: 'absolute', top: 16, right: 20, border: 'none', background: 'none',
+        color: '#fff', fontSize: 28, cursor: 'pointer', lineHeight: 1, padding: 8,
+      }}>×</button>
+
+      <img
+        src={images[idx]}
+        alt=""
+        onClick={e => e.stopPropagation()}
+        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 4 }}
+      />
+
+      {images.length > 1 && (
+        <>
+          <button onClick={prev} aria-label="ก่อนหน้า" style={{
+            position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)',
+            width: 44, height: 44, borderRadius: '50%', border: 'none',
+            background: 'rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', fontSize: 22,
+          }}>‹</button>
+          <button onClick={next} aria-label="ถัดไป" style={{
+            position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)',
+            width: 44, height: 44, borderRadius: '50%', border: 'none',
+            background: 'rgba(255,255,255,0.15)', color: '#fff', cursor: 'pointer', fontSize: 22,
+          }}>›</button>
+          <div style={{
+            position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(255,255,255,0.15)', color: '#fff', fontSize: 13,
+            padding: '4px 12px', borderRadius: 12,
+          }}>
+            {idx + 1} / {images.length}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // Slider รูปภาพ — ใช้ทั้ง thumbnail และรูปรายละเอียดรวมกันเป็นชุดเดียว
+// คลิกที่รูปหลักเพื่อเปิดดูขนาดจริงใน Lightbox
 function ImageSlider({ images }: { images: string[] }) {
   const [idx, setIdx] = useState(0)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
   if (images.length === 0) return null
 
   function prev() { setIdx(i => (i === 0 ? images.length - 1 : i - 1)) }
@@ -100,7 +160,13 @@ function ImageSlider({ images }: { images: string[] }) {
         position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 10,
         overflow: 'hidden', background: '#f1f5f9', border: '1px solid #e2e8f0',
       }}>
-        <img src={images[idx]} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        <img
+          src={images[idx]}
+          alt=""
+          onClick={() => setLightboxOpen(true)}
+          title="คลิกเพื่อดูขนาดจริง"
+          style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'zoom-in' }}
+        />
         {images.length > 1 && (
           <>
             <button type="button" onClick={prev} aria-label="ก่อนหน้า" style={{
@@ -135,6 +201,10 @@ function ImageSlider({ images }: { images: string[] }) {
             </button>
           ))}
         </div>
+      )}
+
+      {lightboxOpen && (
+        <Lightbox images={images} startIndex={idx} onClose={() => setLightboxOpen(false)} />
       )}
     </div>
   )
