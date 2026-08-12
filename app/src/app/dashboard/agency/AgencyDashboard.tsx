@@ -36,10 +36,10 @@ export default async function AgencyDashboard({ userId }: { userId: string }) {
     .eq('owner_id', userId)
     .order('created_at', { ascending: false })
 
-  // ผู้สมัครแพ็กเกจของ agency นี้ (RLS กรองให้เห็นเฉพาะใบสมัครของแพ็กเกจตัวเอง)
+  // ผู้รับบริการ/ผลิตภัณฑ์/โครงการของ agency นี้ (RLS กรองให้เห็นเฉพาะใบสมัครของแพ็กเกจตัวเอง)
   const { data: applicants } = await supabase
     .from('package_applications')
-    .select('id, package_id, status, steps, created_at, packages(title, category), sme_profiles(company_name, province, sme_one_id), application_logs(id, step_key, new_state, note, changed_by_name, changed_by_role, created_at)')
+    .select('id, package_id, status, steps, created_at, packages(title, category), sme_profiles(owner_id, company_name, province, sme_one_id), application_logs(id, step_key, new_state, note, changed_by_name, changed_by_role, created_at)')
     .order('created_at', { ascending: false })
 
   // นับจำนวนผู้สมัครต่อแพ็กเกจ
