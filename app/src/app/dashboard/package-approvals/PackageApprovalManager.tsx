@@ -34,7 +34,7 @@ export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) 
   const [msg, setMsg] = useState('')
   const [rejectFor, setRejectFor] = useState<string | null>(null)
   const [rejectNote, setRejectNote] = useState('')
-  const [detail, setDetail] = useState<Pkg | null>(null)  // บริการที่เปิดดู modal
+  const [detail, setDetail] = useState<Pkg | null>(null)
 
   async function decide(id: string, status: 'approved' | 'rejected' | 'pending') {
     setBusy(id); setMsg('')
@@ -50,6 +50,28 @@ export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) 
 
   const pending = initial.filter(p => p.approval_status === 'pending')
   const approved = initial.filter(p => p.approval_status === 'approved')
+  const rejected = initial.filter(p => p.approval_status === 'rejected')
+
+  // แถวบรรทัดเดียว (ใช้ทั้งอนุมัติแล้ว และไม่ผ่าน)
+  function compactRow(p: Pkg, statusLabel: { text: string; bg: string; color: string }, actions: React.ReactNode) {
+    return (
+      <div key={p.id} style={{ padding: '12px 16px', borderTop: '1px solid #f1f5f9',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <span style={{ fontWeight: 600 }}>{p.title}</span>
+          <span style={{ fontSize: 13, color: '#64748b' }}> · {p.profiles?.agency_name || p.profiles?.full_name || '—'}</span>
+        </div>
+        <span style={{ background: statusLabel.bg, color: statusLabel.color, fontSize: 12,
+          padding: '2px 10px', borderRadius: 10, fontWeight: 600, whiteSpace: 'nowrap' }}>
+          {statusLabel.text}
+        </span>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => setDetail(p)}>รายละเอียด</button>
+          {actions}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -118,7 +140,7 @@ export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) 
         )}
       </div>
 
-      {/* บริการที่อนุมัติแล้ว — บรรทัดเดียว + ปุ่มรายละเอียด (modal) */}
+      {/* บริการที่อนุมัติแล้ว — บรรทัดเดียว */}
       <div>
         <h2 style={{ margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
           บริการที่อนุมัติแล้ว
@@ -136,24 +158,46 @@ export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) 
         ) : (
           <div className="card" style={{ padding: 0 }}>
             {approved.map((p, i) => (
-              <div key={p.id} style={{ borderTop: i === 0 ? 'none' : '1px solid #f1f5f9', padding: '12px 16px',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: 200 }}>
-                  <span style={{ fontWeight: 600 }}>{p.title}</span>
-                  <span style={{ fontSize: 13, color: '#64748b' }}> · {p.profiles?.agency_name || p.profiles?.full_name || '—'}</span>
-                </div>
-                <span style={{ background: '#dcfce7', color: '#166534', fontSize: 12,
-                  padding: '2px 10px', borderRadius: 10, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                  อนุมัติแล้ว
-                </span>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button className="btn btn-ghost btn-sm" onClick={() => setDetail(p)}>รายละเอียด</button>
+              <div key={p.id} style={{ borderTop: i === 0 ? 'none' : undefined }}>
+                {compactRow(p,
+                  { text: 'อนุมัติแล้ว', bg: '#dcfce7', color: '#166534' },
                   <button className="btn btn-ghost btn-sm" disabled={busy === p.id}
-                    onClick={() => decide(p.id, 'pending')}
-                    style={{ color: '#dc2626' }}>
+                    onClick={() => decide(p.id, 'pending')} style={{ color: '#dc2626' }}>
                     {busy === p.id ? '…' : 'ถอนอนุมัติ'}
                   </button>
-                </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* บริการที่ไม่ผ่าน — บรรทัดเดียว */}
+      <div>
+        <h2 style={{ margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          บริการที่ไม่ผ่าน
+          <span style={{ background: rejected.length > 0 ? '#991b1b' : '#94a3b8', color: '#fff',
+            fontSize: 13, fontWeight: 700, borderRadius: 12, padding: '2px 10px' }}>
+            {rejected.length}
+          </span>
+        </h2>
+        {rejected.length === 0 ? (
+          <div className="card">
+            <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '16px 0' }}>
+              ไม่มีบริการที่ไม่ผ่าน
+            </p>
+          </div>
+        ) : (
+          <div className="card" style={{ padding: 0 }}>
+            {rejected.map((p, i) => (
+              <div key={p.id} style={{ borderTop: i === 0 ? 'none' : undefined }}>
+                {compactRow(p,
+                  { text: 'ไม่ผ่าน', bg: '#fee2e2', color: '#991b1b' },
+                  <button className="btn btn-ghost btn-sm" disabled={busy === p.id}
+                    onClick={() => decide(p.id, 'pending')} style={{ color: '#1e3a8a' }}>
+                    {busy === p.id ? '…' : 'นำกลับมาพิจารณา'}
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -168,7 +212,6 @@ export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) 
           <div onClick={e => e.stopPropagation()}
             style={{ background: '#fff', borderRadius: 14, maxWidth: 620, width: '100%',
               marginTop: 40, boxShadow: '0 20px 60px rgba(0,0,0,.3)', overflow: 'hidden' }}>
-            {/* header */}
             <div style={{ background: '#1e3a8a', color: '#fff', padding: '16px 20px',
               display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: 18, fontWeight: 700 }}>รายละเอียดบริการ</div>
@@ -176,11 +219,9 @@ export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) 
                 style={{ border: 'none', background: 'rgba(255,255,255,.2)', color: '#fff',
                   width: 32, height: 32, borderRadius: 8, cursor: 'pointer', fontSize: 18 }}>✕</button>
             </div>
-            {/* body */}
             <div style={{ padding: '16px 20px' }}>
               <PkgDetail p={detail} />
             </div>
-            {/* footer */}
             <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', textAlign: 'right' }}>
               <button className="btn btn-ghost btn-sm" onClick={() => setDetail(null)}>ปิด</button>
             </div>
@@ -191,7 +232,7 @@ export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) 
   )
 }
 
-// รายละเอียดบริการเต็ม (ใช้ทั้งการ์ดรอ และใน modal)
+// รายละเอียดบริการเต็ม
 function PkgDetail({ p }: { p: Pkg }) {
   return (
     <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
