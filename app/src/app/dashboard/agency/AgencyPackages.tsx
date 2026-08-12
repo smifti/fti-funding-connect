@@ -52,6 +52,14 @@ const LOAN_TYPE_OPTIONS = [
 
 const COLLATERAL_OPTIONS = ['ไม่ใช้หลักประกัน', 'ใช้หลักประกัน', 'ใช้บุคคลค้ำประกัน', 'อื่นๆ']
 
+// metadata รูปภาพ 1 รูป (ใช้ทั้งภาพหน้าปกและรูปรายละเอียด)
+export type ImageMeta = {
+  url: string
+  filename: string
+  size: number | null // ไบต์
+  uploaded_at: string | null // ISO timestamp
+}
+
 type Pkg = {
   id: string
   template_type: string
@@ -65,7 +73,7 @@ type Pkg = {
   target_sme: string | null
   target_industry: string | null
   open_period: string | null
-  image_url: string | null
+  image_url: string | null // เดิม เก็บไว้เฉยๆ ไม่ใช้ในฟอร์มแล้ว
   approval_status: string
   is_active: boolean
   service_status: string
@@ -78,7 +86,10 @@ type Pkg = {
   loan_term: string | null
   collateral_required: string | null
   collateral_detail: string | null
-  detail_images: string[] | null
+  // ภาพหน้าปก 2 แบบ + รูปรายละเอียด (jsonb)
+  cover_banner: ImageMeta | null
+  cover_square: ImageMeta | null
+  detail_images: ImageMeta[] | null
   // ข้อมูลจากตาราง package_rate_structures (join แบบ nested เดี่ยว หรือ null ถ้ายังไม่เคยตั้งค่า)
   package_rate_structures?: any | null
 }
@@ -119,20 +130,25 @@ export default function AgencyPackages({
   const [editId, setEditId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
-  const [imageFile, setImageFile] = useState<File | null>(null)
   const [form, setForm] = useState({ ...EMPTY_FORM })
 
   // ด้านที่เกี่ยวข้อง / ประเภทสินเชื่อ (tag สะสม)
   const [sectorTags, setSectorTags] = useState<string[]>([])
   const [sectorPick, setSectorPick] = useState('') // ค่าที่เลือกจาก dropdown หรือพิมพ์เอง (กรณีไม่ใช่สินเชื่อ)
 
-  // รูปรายละเอียดหลายรูป
-  const [existingDetailImages, setExistingDetailImages] = useState<string[]>([])
+  // ภาพหน้าปก 2 แบบ: ไฟล์ใหม่ที่เลือก (ยังไม่ upload) + metadata เดิมจาก DB (ถ้ามี, ตอนแก้ไข)
+  const [coverBannerFile, setCoverBannerFile] = useState<File | null>(null)
+  const [coverBannerExisting, setCoverBannerExisting] = useState<ImageMeta | null>(null)
+  const [coverSquareFile, setCoverSquareFile] = useState<File | null>(null)
+  const [coverSquareExisting, setCoverSquareExisting] = useState<ImageMeta | null>(null)
+
+  // รูปรายละเอียดหลายรูป (สูงสุด 10 ภาพ)
+  const [existingDetailImages, setExistingDetailImages] = useState<ImageMeta[]>([])
   const [newDetailFiles, setNewDetailFiles] = useState<File[]>([])
 
   // อัตราดอกเบี้ย/ค่าบริการทางการเงิน (เฉพาะ package_type = สินเชื่อ)
   const [rateStructure, setRateStructure] = useState<RateStructureForm>(emptyRateStructureForm())
-  const [activeFormTab, setActiveFormTab] = useState<'main' | 'rate'>('main')
+  const [activeFormTab, setActiveFormTab] = useState<'main' | 'rate' | 'images'>('main')
 
   // modal ดูรายละเอียดข้อเสนอ/บริการ (read-only)
   const [detailPkg, setDetailPkg] = useState<Pkg | null>(null)
@@ -141,10 +157,13 @@ export default function AgencyPackages({
 
   function resetForm() {
     setForm({ ...EMPTY_FORM })
-    setImageFile(null)
     setEditId(null)
     setSectorTags([])
     setSectorPick('')
+    setCoverBannerFile(null)
+    setCoverBannerExisting(null)
+    setCoverSquareFile(null)
+    setCoverSquareExisting(null)
     setExistingDetailImages([])
     setNewDetailFiles([])
     setRateStructure(emptyRateStructureForm())
@@ -187,7 +206,10 @@ export default function AgencyPackages({
       collateral_required: p.collateral_required ?? '',
       collateral_detail: p.collateral_detail ?? '',
     })
-    setImageFile(null)
+    setCoverBannerFile(null)
+    setCoverBannerExisting(p.cover_banner ?? null)
+    setCoverSquareFile(null)
+    setCoverSquareExisting(p.cover_square ?? null)
     setSectorTags(p.related_sectors ?? [])
     setSectorPick('')
     setExistingDetailImages(p.detail_images ?? [])
@@ -211,9 +233,21 @@ export default function AgencyPackages({
     setSectorTags(tags => tags.filter(t => t !== val))
   }
 
+  const MAX_DETAIL_IMAGES = 10
+
   function addDetailFiles(files: FileList | null) {
     if (!files) return
-    setNewDetailFiles(prev => [...prev, ...Array.from(files)])
+    const currentTotal = existingDetailImages.length + newDetailFiles.length
+    const room = MAX_DETAIL_IMAGES - currentTotal
+    if (room <= 0) {
+      setMsg(`อัปโหลดรูปรายละเอียดได้สูงสุด ${MAX_DETAIL_IMAGES} ภาพ`)
+      return
+    }
+    const incoming = Array.from(files).slice(0, room)
+    if (files.length > incoming.length) {
+      setMsg(`อัปโหลดรูปรายละเอียดได้สูงสุด ${MAX_DETAIL_IMAGES} ภาพ — เพิ่มได้อีก ${room} ภาพเท่านั้น`)
+    }
+    setNewDetailFiles(prev => [...prev, ...incoming])
   }
 
   function removeNewDetailFile(idx: number) {
@@ -221,7 +255,18 @@ export default function AgencyPackages({
   }
 
   function removeExistingDetailImage(url: string) {
-    setExistingDetailImages(prev => prev.filter(u => u !== url))
+    setExistingDetailImages(prev => prev.filter(img => img.url !== url))
+  }
+
+  function sortDetailImagesByFilename() {
+    setExistingDetailImages(prev => [...prev].sort((a, b) => a.filename.localeCompare(b.filename, 'th')))
+    setNewDetailFiles(prev => [...prev].sort((a, b) => a.name.localeCompare(b.name, 'th')))
+  }
+
+  function clearAllDetailImages() {
+    if (!confirm('ต้องการล้างรูปรายละเอียดทั้งหมดใช่หรือไม่?')) return
+    setExistingDetailImages([])
+    setNewDetailFiles([])
   }
 
   async function save() {
@@ -233,34 +278,47 @@ export default function AgencyPackages({
     }
     setBusy(true); setMsg('')
 
-    // อัปโหลด thumbnail (ถ้ามีการเปลี่ยน)
-    let imageUrl: string | null | undefined = undefined
-    if (imageFile) {
-      const ext = imageFile.name.split('.').pop()
-      const path = `${ownerId}/${Date.now()}.${ext}`
-      const { error: upErr } = await supabase.storage
-        .from('package-images')
-        .upload(path, imageFile)
-      if (upErr) { setBusy(false); setMsg('อัปโหลดรูปไม่สำเร็จ: ' + upErr.message); return }
+    // helper: upload ไฟล์เดียว คืน ImageMeta
+    async function uploadImage(file: File, prefix: string): Promise<{ meta?: ImageMeta; error?: string }> {
+      const ext = file.name.split('.').pop()
+      const path = `${ownerId}/${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+      const { error: upErr } = await supabase.storage.from('package-images').upload(path, file)
+      if (upErr) return { error: upErr.message }
       const { data: pub } = supabase.storage.from('package-images').getPublicUrl(path)
-      imageUrl = pub.publicUrl
+      return {
+        meta: {
+          url: pub.publicUrl,
+          filename: file.name,
+          size: file.size,
+          uploaded_at: new Date().toISOString(),
+        },
+      }
+    }
+
+    // อัปโหลดภาพหน้าปกแบนเนอร์ (ถ้ามีการเปลี่ยน)
+    let coverBannerMeta: ImageMeta | null | undefined = undefined
+    if (coverBannerFile) {
+      const res = await uploadImage(coverBannerFile, 'cover-banner')
+      if (res.error) { setBusy(false); setActiveFormTab('images'); setMsg('อัปโหลดภาพหน้าปกแบนเนอร์ไม่สำเร็จ: ' + res.error); return }
+      coverBannerMeta = res.meta!
+    }
+
+    // อัปโหลดภาพหน้าปกจตุรัส (ถ้ามีการเปลี่ยน)
+    let coverSquareMeta: ImageMeta | null | undefined = undefined
+    if (coverSquareFile) {
+      const res = await uploadImage(coverSquareFile, 'cover-square')
+      if (res.error) { setBusy(false); setActiveFormTab('images'); setMsg('อัปโหลดภาพหน้าปกจตุรัสไม่สำเร็จ: ' + res.error); return }
+      coverSquareMeta = res.meta!
     }
 
     // อัปโหลดรูปรายละเอียดใหม่ (ถ้ามี)
-    let uploadedDetailUrls: string[] = []
-    if (newDetailFiles.length > 0) {
-      for (const file of newDetailFiles) {
-        const ext = file.name.split('.').pop()
-        const path = `${ownerId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
-        const { error: upErr } = await supabase.storage
-          .from('package-detail-images')
-          .upload(path, file)
-        if (upErr) { setBusy(false); setMsg('อัปโหลดรูปรายละเอียดไม่สำเร็จ: ' + upErr.message); return }
-        const { data: pub } = supabase.storage.from('package-detail-images').getPublicUrl(path)
-        uploadedDetailUrls.push(pub.publicUrl)
-      }
+    let uploadedDetailMetas: ImageMeta[] = []
+    for (const file of newDetailFiles) {
+      const res = await uploadImage(file, 'detail')
+      if (res.error) { setBusy(false); setActiveFormTab('images'); setMsg('อัปโหลดรูปรายละเอียดไม่สำเร็จ: ' + res.error); return }
+      uploadedDetailMetas.push(res.meta!)
     }
-    const finalDetailImages = [...existingDetailImages, ...uploadedDetailUrls]
+    const finalDetailImages = [...existingDetailImages, ...uploadedDetailMetas].slice(0, MAX_DETAIL_IMAGES)
 
     const isLoan = form.package_type === 'สินเชื่อ'
     // auto-set template_type ตาม package_type (ไม่แสดง dropdown นี้ใน UI แล้ว แต่ยังต้องเก็บค่าให้ถูกต้อง
@@ -290,7 +348,8 @@ export default function AgencyPackages({
       collateral_detail: isLoan ? (form.collateral_detail.trim() || null) : null,
       detail_images: finalDetailImages.length > 0 ? finalDetailImages : null,
     }
-    if (imageUrl !== undefined) payload.image_url = imageUrl
+    if (coverBannerMeta !== undefined) payload.cover_banner = coverBannerMeta
+    if (coverSquareMeta !== undefined) payload.cover_square = coverSquareMeta
 
     let error
     let savedPackageId: string | null = editId
@@ -300,7 +359,9 @@ export default function AgencyPackages({
       error = res.error
     } else {
       payload.owner_id = ownerId
-      payload.image_url = imageUrl ?? null
+      // ถ้าไม่ได้อัปโหลด cover ใหม่ตอนสร้างใหม่ ให้ค่าเป็น null ชัดเจน (กัน undefined หลุดเข้า DB)
+      if (payload.cover_banner === undefined) payload.cover_banner = null
+      if (payload.cover_square === undefined) payload.cover_square = null
       const res = await supabase.from('packages').insert(payload).select('id').single()
       error = res.error
       savedPackageId = res.data?.id ?? null
@@ -383,19 +444,19 @@ export default function AgencyPackages({
             </div>
           )}
 
-          {/* Tab switcher: ข้อมูลทั่วไป / อัตราดอกเบี้ย (เฉพาะสินเชื่อ) */}
-          {isLoan && (
-            <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #e2e8f0' }}>
-              <button type="button" onClick={() => setActiveFormTab('main')}
-                style={{
-                  padding: '8px 16px', border: 'none', background: 'none', cursor: 'pointer',
-                  fontSize: 14, fontWeight: 600,
-                  color: activeFormTab === 'main' ? '#2563eb' : '#94a3b8',
-                  borderBottom: activeFormTab === 'main' ? '2px solid #2563eb' : '2px solid transparent',
-                  marginBottom: -2,
-                }}>
-                ข้อมูลทั่วไป
-              </button>
+          {/* Tab switcher: ข้อมูลทั่วไป / อัตราดอกเบี้ย (เฉพาะสินเชื่อ) / ภาพประกอบ */}
+          <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #e2e8f0', flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => setActiveFormTab('main')}
+              style={{
+                padding: '8px 16px', border: 'none', background: 'none', cursor: 'pointer',
+                fontSize: 14, fontWeight: 600,
+                color: activeFormTab === 'main' ? '#2563eb' : '#94a3b8',
+                borderBottom: activeFormTab === 'main' ? '2px solid #2563eb' : '2px solid transparent',
+                marginBottom: -2,
+              }}>
+              ข้อมูลทั่วไป
+            </button>
+            {isLoan && (
               <button type="button" onClick={() => setActiveFormTab('rate')}
                 style={{
                   padding: '8px 16px', border: 'none', background: 'none', cursor: 'pointer',
@@ -406,11 +467,40 @@ export default function AgencyPackages({
                 }}>
                 📊 อัตราดอกเบี้ย / ค่าบริการทางการเงิน
               </button>
-            </div>
-          )}
+            )}
+            <button type="button" onClick={() => setActiveFormTab('images')}
+              style={{
+                padding: '8px 16px', border: 'none', background: 'none', cursor: 'pointer',
+                fontSize: 14, fontWeight: 600,
+                color: activeFormTab === 'images' ? '#2563eb' : '#94a3b8',
+                borderBottom: activeFormTab === 'images' ? '2px solid #2563eb' : '2px solid transparent',
+                marginBottom: -2,
+              }}>
+              🖼️ ภาพประกอบ
+            </button>
+          </div>
 
           {activeFormTab === 'rate' && isLoan ? (
             <RateStructureTab value={rateStructure} onChange={setRateStructure} />
+          ) : activeFormTab === 'images' ? (
+            <ImagesTab
+              coverBannerFile={coverBannerFile}
+              setCoverBannerFile={setCoverBannerFile}
+              coverBannerExisting={coverBannerExisting}
+              onRemoveCoverBanner={() => { setCoverBannerFile(null); setCoverBannerExisting(null) }}
+              coverSquareFile={coverSquareFile}
+              setCoverSquareFile={setCoverSquareFile}
+              coverSquareExisting={coverSquareExisting}
+              onRemoveCoverSquare={() => { setCoverSquareFile(null); setCoverSquareExisting(null) }}
+              existingDetailImages={existingDetailImages}
+              newDetailFiles={newDetailFiles}
+              maxDetailImages={MAX_DETAIL_IMAGES}
+              addDetailFiles={addDetailFiles}
+              removeNewDetailFile={removeNewDetailFile}
+              removeExistingDetailImage={removeExistingDetailImage}
+              onSortByFilename={sortDetailImagesByFilename}
+              onClearAll={clearAllDetailImages}
+            />
           ) : (
           <>
           {/* ชื่อข้อเสนอ/บริการ */}
@@ -621,54 +711,6 @@ export default function AgencyPackages({
             <input style={fieldStyle} value={form.support_items}
               onChange={e => set('support_items', e.target.value)} placeholder="เช่น ค่าที่ปรึกษา, ค่าเครื่องจักร, ค่า Training" />
           </div>
-
-          {/* Thumbnail */}
-          <div>
-            <label style={labelStyle}>รูปภาพหน้าปก (thumbnail)</label>
-            <input style={{ ...fieldStyle, padding: 6 }} type="file" accept="image/*"
-              onChange={e => setImageFile(e.target.files?.[0] ?? null)} />
-            {imageFile && (
-              <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>เลือกแล้ว: {imageFile.name}</div>
-            )}
-            {editId && !imageFile && (
-              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>เว้นว่างไว้ = ใช้รูปเดิม</div>
-            )}
-          </div>
-
-          {/* รูปรายละเอียดหลายรูป */}
-          <div>
-            <label style={labelStyle}>รูปรายละเอียด (เพิ่มได้หลายรูป)</label>
-            <input style={{ ...fieldStyle, padding: 6 }} type="file" accept="image/*" multiple
-              onChange={e => { addDetailFiles(e.target.files); e.target.value = '' }} />
-
-            {(existingDetailImages.length > 0 || newDetailFiles.length > 0) && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-                {existingDetailImages.map(url => (
-                  <div key={url} style={{ position: 'relative', width: 72, height: 72 }}>
-                    <img src={url} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }} />
-                    <button type="button" onClick={() => removeExistingDetailImage(url)}
-                      style={{
-                        position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%',
-                        background: '#dc2626', color: '#fff', border: 'none', fontSize: 12, cursor: 'pointer', lineHeight: 1,
-                      }}>×</button>
-                  </div>
-                ))}
-                {newDetailFiles.map((file, idx) => (
-                  <div key={idx} style={{ position: 'relative', width: 72, height: 72 }}>
-                    <img src={URL.createObjectURL(file)} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 6, border: '1px solid #93c5fd' }} />
-                    <button type="button" onClick={() => removeNewDetailFile(idx)}
-                      style={{
-                        position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%',
-                        background: '#dc2626', color: '#fff', border: 'none', fontSize: 12, cursor: 'pointer', lineHeight: 1,
-                      }}>×</button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
-              รูปจะแสดงไล่ลงมาตามลำดับที่เพิ่ม
-            </div>
-          </div>
           </>
           )}
 
@@ -699,8 +741,8 @@ export default function AgencyPackages({
                 <tr key={p.id}>
                   <td>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                      {p.image_url && (
-                        <img src={p.image_url} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
+                      {(p.cover_square?.url || p.image_url) && (
+                        <img src={p.cover_square?.url || p.image_url!} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
                       )}
                       <div>
                         <button type="button" onClick={() => setDetailPkg(p)}
@@ -785,5 +827,327 @@ export default function AgencyPackages({
       />
     )}
     </>
+  )
+}
+
+// ============================================
+// helper: format ขนาดไฟล์และวันที่ให้อ่านง่าย (แบบไทย)
+// ============================================
+function formatFileSize(bytes: number | null): string {
+  if (bytes == null) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+function formatThaiDate(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const buddhistYear = d.getFullYear() + 543
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${dd}/${mm}/${buddhistYear} ${hh}:${min}`
+}
+
+// ============================================
+// การ์ดอัปโหลดภาพหน้าปก 1 ช่อง (แบนเนอร์ หรือ จตุรัส) — dropzone ซ้าย + ตัวอย่างภาพปัจจุบันขวา
+// ============================================
+function CoverUploadCard({
+  title, ratioLabel, recommendSize, file, setFile, existing, onRemove,
+}: {
+  title: string
+  ratioLabel: string
+  recommendSize: string
+  file: File | null
+  setFile: (f: File | null) => void
+  existing: ImageMeta | null
+  onRemove: () => void
+}) {
+  const [dragOver, setDragOver] = useState(false)
+  const preview = file ? URL.createObjectURL(file) : existing?.url ?? null
+  const hasUploaded = !!(file || existing)
+
+  const labelStyle = { fontSize: 13, color: '#475569', fontWeight: 500 } as const
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <label style={labelStyle}>{title}</label>
+        <span style={{
+          fontSize: 11, color: '#64748b', background: '#f1f5f9',
+          padding: '2px 8px', borderRadius: 10,
+        }}>
+          อัตราส่วน {ratioLabel}
+        </span>
+      </div>
+      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+        แนะนำขนาด {recommendSize} · รองรับไฟล์ JPG, PNG ขนาดไม่เกิน 5 MB
+      </div>
+
+      <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+        {/* Dropzone */}
+        <label
+          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={e => { e.preventDefault(); setDragOver(false) }}
+          onDrop={e => {
+            e.preventDefault(); setDragOver(false)
+            const f = e.dataTransfer.files?.[0]
+            if (f && f.type.startsWith('image/')) setFile(f)
+          }}
+          style={{
+            flex: '1 1 200px', cursor: 'pointer', textAlign: 'center',
+            padding: '20px 12px', borderRadius: 10, minHeight: 120,
+            border: `2px dashed ${dragOver ? '#1e3a8a' : '#cbd5e1'}`,
+            background: dragOver ? '#eff6ff' : '#f8fafc',
+            color: '#64748b', fontSize: 13, transition: 'all .15s',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          }}>
+          <div style={{ fontSize: 26, marginBottom: 6 }}>☁️</div>
+          <div>ลากรูปมาวางที่นี่</div>
+          <div style={{ color: '#2563eb', fontWeight: 600 }}>หรือคลิกเพื่อเลือกไฟล์</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>(อัปโหลดได้ 1 ภาพ)</div>
+          <input type="file" accept="image/*" style={{ display: 'none' }}
+            onChange={e => setFile(e.target.files?.[0] ?? null)} />
+        </label>
+
+        {/* ตัวอย่างภาพปัจจุบัน */}
+        {hasUploaded && preview && (
+          <div style={{ flex: '1 1 200px', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: '#64748b' }}>ตัวอย่างภาพปัจจุบัน</span>
+              <span style={{
+                fontSize: 11, color: '#166534', background: '#dcfce7',
+                padding: '2px 8px', borderRadius: 10, fontWeight: 600,
+              }}>
+                {file ? 'เลือกใหม่ (ยังไม่บันทึก)' : 'อัปโหลดแล้ว'}
+              </span>
+            </div>
+            <img src={preview} alt="" style={{
+              width: '100%', maxHeight: 140, objectFit: 'cover', borderRadius: 8,
+              border: '1px solid #e2e8f0', display: 'block',
+            }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 6 }}>
+              <div>
+                <div style={{ fontSize: 12, color: '#334155', fontWeight: 500 }}>
+                  {file ? file.name : existing?.filename}
+                </div>
+                {!file && existing?.uploaded_at && (
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                    อัปโหลดเมื่อ {formatThaiDate(existing.uploaded_at)}
+                  </div>
+                )}
+              </div>
+              <button type="button" onClick={onRemove} title="ลบรูป"
+                style={{ border: 'none', background: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16, padding: 4 }}>
+                🗑
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// แท็บภาพประกอบ — ภาพหน้าปก 2 แบบ (แบนเนอร์/จตุรัส) + แกลเลอรีรูปรายละเอียดสูงสุด 10 ภาพ
+// ============================================
+function ImagesTab({
+  coverBannerFile, setCoverBannerFile, coverBannerExisting, onRemoveCoverBanner,
+  coverSquareFile, setCoverSquareFile, coverSquareExisting, onRemoveCoverSquare,
+  existingDetailImages, newDetailFiles, maxDetailImages,
+  addDetailFiles, removeNewDetailFile, removeExistingDetailImage,
+  onSortByFilename, onClearAll,
+}: {
+  coverBannerFile: File | null
+  setCoverBannerFile: (f: File | null) => void
+  coverBannerExisting: ImageMeta | null
+  onRemoveCoverBanner: () => void
+  coverSquareFile: File | null
+  setCoverSquareFile: (f: File | null) => void
+  coverSquareExisting: ImageMeta | null
+  onRemoveCoverSquare: () => void
+  existingDetailImages: ImageMeta[]
+  newDetailFiles: File[]
+  maxDetailImages: number
+  addDetailFiles: (files: FileList | null) => void
+  removeNewDetailFile: (idx: number) => void
+  removeExistingDetailImage: (url: string) => void
+  onSortByFilename: () => void
+  onClearAll: () => void
+}) {
+  const [detailDragOver, setDetailDragOver] = useState(false)
+  const totalDetail = existingDetailImages.length + newDetailFiles.length
+  const roomLeft = maxDetailImages - totalDetail
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      {/* ① ภาพหน้าปก / Profile บริการ */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            width: 22, height: 22, borderRadius: '50%', background: '#2563eb', color: '#fff',
+            fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          }}>1</span>
+          <h3 style={{ margin: 0, fontSize: 15, color: '#1e293b' }}>ภาพหน้าปก / Profile บริการ</h3>
+        </div>
+        <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 14px 30px' }}>
+          อัปโหลดภาพหน้าปก 2 แบบ เพื่อใช้แสดงบนหน้าเพจและสื่อโซเชียล
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingLeft: 30 }}>
+          <CoverUploadCard
+            title="1) ภาพหน้าปกแนวยาว (แบนเนอร์)"
+            ratioLabel="2:1"
+            recommendSize="1200 x 600 px (กว้าง x สูง)"
+            file={coverBannerFile}
+            setFile={setCoverBannerFile}
+            existing={coverBannerExisting}
+            onRemove={onRemoveCoverBanner}
+          />
+          <CoverUploadCard
+            title="2) ภาพหน้าปกจตุรัส (สี่เหลี่ยมจัตุรัส)"
+            ratioLabel="1:1"
+            recommendSize="1080 x 1080 px (กว้าง x สูง)"
+            file={coverSquareFile}
+            setFile={setCoverSquareFile}
+            existing={coverSquareExisting}
+            onRemove={onRemoveCoverSquare}
+          />
+        </div>
+      </div>
+
+      {/* ② ภาพรายละเอียดบริการ */}
+      <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{
+            width: 22, height: 22, borderRadius: '50%', background: '#2563eb', color: '#fff',
+            fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          }}>2</span>
+          <h3 style={{ margin: 0, fontSize: 15, color: '#1e293b' }}>ภาพรายละเอียดบริการ</h3>
+          <span style={{
+            fontSize: 11, color: '#0369a1', background: '#e0f2fe',
+            padding: '2px 8px', borderRadius: 10,
+          }}>
+            อัปโหลดได้สูงสุด {maxDetailImages} ภาพ
+          </span>
+        </div>
+        <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 14px 30px' }}>
+          อัปโหลดภาพรายละเอียดเพิ่มเติม เพื่อแสดงในแกลเลอรี
+        </p>
+
+        <div style={{ paddingLeft: 30 }}>
+          <label
+            onDragOver={e => { e.preventDefault(); setDetailDragOver(true) }}
+            onDragLeave={e => { e.preventDefault(); setDetailDragOver(false) }}
+            onDrop={e => {
+              e.preventDefault(); setDetailDragOver(false)
+              const files = Array.from(e.dataTransfer.files ?? []).filter(f => f.type.startsWith('image/'))
+              if (files.length > 0) {
+                const dt = new DataTransfer()
+                files.forEach(f => dt.items.add(f))
+                addDetailFiles(dt.files)
+              }
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8,
+              cursor: roomLeft > 0 ? 'pointer' : 'not-allowed', padding: '16px 18px', borderRadius: 10,
+              border: `2px dashed ${detailDragOver ? '#1e3a8a' : '#cbd5e1'}`,
+              background: detailDragOver ? '#eff6ff' : '#f8fafc',
+              color: '#64748b', fontSize: 13, opacity: roomLeft > 0 ? 1 : 0.6,
+            }}>
+            <span>
+              <span style={{ marginRight: 6 }}>☁️</span>
+              ลากรูปมาวางที่นี่ <span style={{ color: '#2563eb', fontWeight: 600 }}>หรือคลิกเพื่อเลือกไฟล์</span>
+            </span>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>อัปโหลดได้สูงสุด {maxDetailImages} ภาพ</span>
+            <input type="file" accept="image/*" multiple style={{ display: 'none' }} disabled={roomLeft <= 0}
+              onChange={e => { addDetailFiles(e.target.files); e.target.value = '' }} />
+          </label>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, flexWrap: 'wrap', gap: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
+              แกลเลอรี ({totalDetail} / {maxDetailImages} ภาพ)
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={onSortByFilename} disabled={totalDetail === 0}>
+                ⇅ จัดเรียงอัตโนมัติ
+              </button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={onClearAll} disabled={totalDetail === 0}
+                style={{ color: '#dc2626' }}>
+                🗑 ล้างรายการทั้งหมด
+              </button>
+            </div>
+          </div>
+
+          {totalDetail > 0 && (
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+              gap: 10, marginTop: 12,
+            }}>
+              {existingDetailImages.map(img => (
+                <div key={img.url} style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
+                  <button type="button" onClick={() => removeExistingDetailImage(img.url)} title="ลบรูป"
+                    style={{
+                      position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: '50%',
+                      background: 'rgba(15,23,42,0.6)', color: '#fff', border: 'none', fontSize: 12, cursor: 'pointer',
+                      lineHeight: 1, zIndex: 1,
+                    }}>×</button>
+                  <img src={img.url} alt="" style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }} />
+                  <div style={{ padding: '6px 8px' }}>
+                    <div style={{ fontSize: 11, color: '#334155', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {img.filename}
+                    </div>
+                    <div style={{ fontSize: 10, color: '#94a3b8' }}>
+                      {img.uploaded_at && `อัปโหลดเมื่อ ${formatThaiDate(img.uploaded_at)}`}
+                      {img.uploaded_at && img.size != null && <br />}
+                      {formatFileSize(img.size)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {newDetailFiles.map((file, idx) => (
+                <div key={idx} style={{ border: '1px solid #93c5fd', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
+                  <button type="button" onClick={() => removeNewDetailFile(idx)} title="ลบรูป"
+                    style={{
+                      position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: '50%',
+                      background: 'rgba(15,23,42,0.6)', color: '#fff', border: 'none', fontSize: 12, cursor: 'pointer',
+                      lineHeight: 1, zIndex: 1,
+                    }}>×</button>
+                  <img src={URL.createObjectURL(file)} alt="" style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }} />
+                  <div style={{ padding: '6px 8px' }}>
+                    <div style={{ fontSize: 11, color: '#334155', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {file.name}
+                    </div>
+                    <div style={{ fontSize: 10, color: '#2563eb' }}>{formatFileSize(file.size)} · ยังไม่บันทึก</div>
+                  </div>
+                </div>
+              ))}
+              {/* ปุ่มเพิ่มรูปภาพ (ถ้ายังไม่เต็ม) */}
+              {roomLeft > 0 && (
+                <label style={{
+                  border: '2px dashed #cbd5e1', borderRadius: 8, minHeight: 120, cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  color: '#2563eb', fontSize: 13, fontWeight: 600, gap: 4,
+                }}>
+                  <span style={{ fontSize: 20 }}>+</span>
+                  เพิ่มรูปภาพ
+                  <input type="file" accept="image/*" multiple style={{ display: 'none' }}
+                    onChange={e => { addDetailFiles(e.target.files); e.target.value = '' }} />
+                </label>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{
+        background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8,
+        padding: '10px 12px', fontSize: 12, color: '#1e40af',
+      }}>
+        ℹ️ แนะนำให้ใช้รูปที่มีคุณภาพดี มีความคมชัดสูง เพื่อประสบการณ์ที่ดีของผู้ใช้งาน
+      </div>
+    </div>
   )
 }
