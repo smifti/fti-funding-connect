@@ -946,8 +946,8 @@ function CoverUploadCard({
               </span>
             </div>
             <img src={preview} alt="" style={{
-              width: '100%', maxHeight: 140, objectFit: 'cover', borderRadius: 8,
-              border: '1px solid #e2e8f0', display: 'block',
+              width: '100%', aspectRatio: `${aspectRatio}`, objectFit: 'cover', borderRadius: 8,
+              border: '1px solid #e2e8f0', display: 'block', maxHeight: 200,
             }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 6 }}>
               <div>
