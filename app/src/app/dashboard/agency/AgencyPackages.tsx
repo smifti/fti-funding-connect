@@ -2,6 +2,13 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
+import RateStructureTab, {
+  RateStructureForm,
+  emptyRateStructureForm,
+  rateStructureFromRow,
+  rateStructureToPayload,
+  validateRateStructure,
+} from './RateStructureTab'
 
 // หมวดหมู่ข้อเสนอ/บริการ (ค่าที่เก็บใน DB = ค่าเดียวกับ label ที่แสดง เพราะ category เป็น text ธรรมดา)
 const CATEGORY_OPTIONS = [
@@ -67,11 +74,12 @@ type Pkg = {
   min_amount: number | null
   max_amount: number | null
   eligibility_criteria: string | null
-  interest_rate: string | null
   loan_term: string | null
   collateral_required: string | null
   collateral_detail: string | null
   detail_images: string[] | null
+  // ข้อมูลจากตาราง package_rate_structures (join แบบ nested เดี่ยว หรือ null ถ้ายังไม่เคยตั้งค่า)
+  package_rate_structures?: any | null
 }
 
 const EMPTY_FORM = {
@@ -91,7 +99,6 @@ const EMPTY_FORM = {
   min_amount: '',
   max_amount: '',
   eligibility_criteria: '',
-  interest_rate: '',
   loan_term: '',
   collateral_required: '',
   collateral_detail: '',
@@ -122,6 +129,10 @@ export default function AgencyPackages({
   const [existingDetailImages, setExistingDetailImages] = useState<string[]>([])
   const [newDetailFiles, setNewDetailFiles] = useState<File[]>([])
 
+  // อัตราดอกเบี้ย/ค่าบริการทางการเงิน (เฉพาะ package_type = สินเชื่อ)
+  const [rateStructure, setRateStructure] = useState<RateStructureForm>(emptyRateStructureForm())
+  const [activeFormTab, setActiveFormTab] = useState<'main' | 'rate'>('main')
+
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
 
   function resetForm() {
@@ -132,6 +143,8 @@ export default function AgencyPackages({
     setSectorPick('')
     setExistingDetailImages([])
     setNewDetailFiles([])
+    setRateStructure(emptyRateStructureForm())
+    setActiveFormTab('main')
   }
 
   function openCreate() {
@@ -166,7 +179,6 @@ export default function AgencyPackages({
       min_amount: p.min_amount != null ? String(p.min_amount) : '',
       max_amount: p.max_amount != null ? String(p.max_amount) : '',
       eligibility_criteria: p.eligibility_criteria ?? '',
-      interest_rate: p.interest_rate ?? '',
       loan_term: p.loan_term ?? '',
       collateral_required: p.collateral_required ?? '',
       collateral_detail: p.collateral_detail ?? '',
@@ -176,6 +188,8 @@ export default function AgencyPackages({
     setSectorPick('')
     setExistingDetailImages(p.detail_images ?? [])
     setNewDetailFiles([])
+    setRateStructure(rateStructureFromRow(p.package_rate_structures))
+    setActiveFormTab('main')
     setEditId(p.id)
     setShowForm(true)
     setMsg('')
@@ -208,6 +222,11 @@ export default function AgencyPackages({
 
   async function save() {
     if (!form.title.trim()) { setMsg('กรุณาระบุชื่อข้อเสนอ/บริการ'); return }
+    const isLoanCheck = form.package_type === 'สินเชื่อ'
+    if (isLoanCheck) {
+      const rateErr = validateRateStructure(rateStructure)
+      if (rateErr) { setMsg(rateErr); setActiveFormTab('rate'); return }
+    }
     setBusy(true); setMsg('')
 
     // อัปโหลด thumbnail (ถ้ามีการเปลี่ยน)
@@ -262,7 +281,6 @@ export default function AgencyPackages({
       min_amount: form.min_amount ? Number(form.min_amount) : null,
       max_amount: form.max_amount ? Number(form.max_amount) : null,
       eligibility_criteria: form.eligibility_criteria.trim() || null,
-      interest_rate: isLoan ? (form.interest_rate.trim() || null) : null,
       loan_term: isLoan ? (form.loan_term.trim() || null) : null,
       collateral_required: isLoan ? (form.collateral_required || null) : null,
       collateral_detail: isLoan ? (form.collateral_detail.trim() || null) : null,
@@ -271,6 +289,7 @@ export default function AgencyPackages({
     if (imageUrl !== undefined) payload.image_url = imageUrl
 
     let error
+    let savedPackageId: string | null = editId
     if (editId) {
       payload.approval_status = 'pending'
       const res = await supabase.from('packages').update(payload).eq('id', editId)
@@ -278,11 +297,31 @@ export default function AgencyPackages({
     } else {
       payload.owner_id = ownerId
       payload.image_url = imageUrl ?? null
-      const res = await supabase.from('packages').insert(payload)
+      const res = await supabase.from('packages').insert(payload).select('id').single()
       error = res.error
+      savedPackageId = res.data?.id ?? null
     }
+    if (error) { setBusy(false); setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
+
+    // บันทึก/ลบ โครงสร้างอัตราดอกเบี้ย ตาม package_type
+    if (savedPackageId) {
+      if (isLoan) {
+        const ratePayload = rateStructureToPayload(rateStructure, savedPackageId)
+        const { error: rateErr } = await supabase
+          .from('package_rate_structures')
+          .upsert(ratePayload, { onConflict: 'package_id' })
+        if (rateErr) {
+          setBusy(false)
+          setMsg('บันทึกข้อมูลอัตราดอกเบี้ยไม่สำเร็จ: ' + rateErr.message)
+          return
+        }
+      } else {
+        // ไม่ใช่สินเชื่ออีกต่อไป (เปลี่ยนประเภทตอนแก้ไข) → ล้างข้อมูลอัตราดอกเบี้ยเดิมทิ้ง ไม่ให้ค้างเป็นข้อมูลกำพร้า
+        await supabase.from('package_rate_structures').delete().eq('package_id', savedPackageId)
+      }
+    }
+
     setBusy(false)
-    if (error) { setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
     setShowForm(false)
     resetForm()
     router.refresh()
@@ -339,6 +378,36 @@ export default function AgencyPackages({
             </div>
           )}
 
+          {/* Tab switcher: ข้อมูลทั่วไป / อัตราดอกเบี้ย (เฉพาะสินเชื่อ) */}
+          {isLoan && (
+            <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #e2e8f0' }}>
+              <button type="button" onClick={() => setActiveFormTab('main')}
+                style={{
+                  padding: '8px 16px', border: 'none', background: 'none', cursor: 'pointer',
+                  fontSize: 14, fontWeight: 600,
+                  color: activeFormTab === 'main' ? '#2563eb' : '#94a3b8',
+                  borderBottom: activeFormTab === 'main' ? '2px solid #2563eb' : '2px solid transparent',
+                  marginBottom: -2,
+                }}>
+                ข้อมูลทั่วไป
+              </button>
+              <button type="button" onClick={() => setActiveFormTab('rate')}
+                style={{
+                  padding: '8px 16px', border: 'none', background: 'none', cursor: 'pointer',
+                  fontSize: 14, fontWeight: 600,
+                  color: activeFormTab === 'rate' ? '#2563eb' : '#94a3b8',
+                  borderBottom: activeFormTab === 'rate' ? '2px solid #2563eb' : '2px solid transparent',
+                  marginBottom: -2,
+                }}>
+                📊 อัตราดอกเบี้ย / ค่าบริการทางการเงิน
+              </button>
+            </div>
+          )}
+
+          {activeFormTab === 'rate' && isLoan ? (
+            <RateStructureTab value={rateStructure} onChange={setRateStructure} />
+          ) : (
+          <>
           {/* ชื่อข้อเสนอ/บริการ */}
           <div>
             <label style={labelStyle}>ชื่อข้อเสนอ/บริการ / โครงการ *</label>
@@ -376,9 +445,11 @@ export default function AgencyPackages({
                 value={PACKAGE_TYPE_OPTIONS.includes(form.package_type) ? form.package_type : (form.package_type ? 'อื่นๆ' : '')}
                 onChange={e => {
                   const v = e.target.value
-                  set('package_type', v === 'อื่นๆ' ? '' : v)
+                  const newType = v === 'อื่นๆ' ? '' : v
+                  set('package_type', newType)
                   setSectorTags([]) // เปลี่ยนประเภท ล้าง tag เดิมเพื่อไม่ให้ปนกัน
                   setSectorPick('')
+                  if (newType !== 'สินเชื่อ') setActiveFormTab('main') // ไม่ใช่สินเชื่อแล้ว กลับไปแท็บข้อมูลทั่วไป
                 }}>
                 <option value="">-- เลือกประเภท --</option>
                 {PACKAGE_TYPE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
@@ -501,21 +572,14 @@ export default function AgencyPackages({
               onChange={e => set('price_note', e.target.value)} placeholder='เช่น "สูงสุด" / "ติดต่อสอบถาม" / "ตามหลักเกณฑ์ที่ธนาคารกำหนด"' />
           </div>
 
-          {/* เฉพาะสินเชื่อ: ดอกเบี้ย / ระยะเวลากู้ / หลักประกัน */}
+          {/* เฉพาะสินเชื่อ: ระยะเวลากู้ / หลักประกัน (อัตราดอกเบี้ยแยกไปแท็บ "อัตราดอกเบี้ย/ค่าบริการทางการเงิน") */}
           {isLoan && (
             <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>ข้อมูลเฉพาะสินเชื่อ</div>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>อัตราดอกเบี้ย</label>
-                  <input style={fieldStyle} value={form.interest_rate}
-                    onChange={e => set('interest_rate', e.target.value)} placeholder='เช่น "MRR - 1% ต่อปี"' />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>ระยะเวลากู้</label>
-                  <input style={fieldStyle} value={form.loan_term}
-                    onChange={e => set('loan_term', e.target.value)} placeholder='เช่น "สูงสุด 7 ปี"' />
-                </div>
+              <div>
+                <label style={labelStyle}>ระยะเวลากู้</label>
+                <input style={fieldStyle} value={form.loan_term}
+                  onChange={e => set('loan_term', e.target.value)} placeholder='เช่น "สูงสุด 7 ปี"' />
               </div>
               <div>
                 <label style={labelStyle}>หลักประกัน</label>
@@ -527,6 +591,10 @@ export default function AgencyPackages({
                   value={form.collateral_detail} onChange={e => set('collateral_detail', e.target.value)}
                   placeholder="รายละเอียดหลักประกัน (ถ้ามี)" />
               </div>
+              <button type="button" className="btn btn-sm" onClick={() => setActiveFormTab('rate')}
+                style={{ alignSelf: 'flex-start' }}>
+                📊 ไปกรอกอัตราดอกเบี้ย / ค่าบริการทางการเงิน →
+              </button>
             </div>
           )}
 
@@ -596,6 +664,8 @@ export default function AgencyPackages({
               รูปจะแสดงไล่ลงมาตามลำดับที่เพิ่ม
             </div>
           </div>
+          </>
+          )}
 
           <div>
             <button className="btn" disabled={busy} onClick={save}>
@@ -607,6 +677,7 @@ export default function AgencyPackages({
           </p>
         </div>
       )}
+
 
       {initial.length === 0 ? (
         <p className="empty" style={{ marginTop: 16 }}>ยังไม่มีข้อเสนอ/บริการ — กด "สร้างข้อเสนอ/บริการใหม่" เพื่อเริ่ม</p>
