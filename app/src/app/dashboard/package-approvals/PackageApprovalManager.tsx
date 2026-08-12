@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
+
 const CATEGORY_LABELS: Record<string, string> = {
   credit: 'สินเชื่อ', innovation: 'นวัตกรรม', management: 'บริหารจัดการ',
   marketing: 'การตลาด', production: 'การผลิต', upskill: 'Upskill / Reskill',
@@ -10,6 +11,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 const TEMPLATE_LABELS: Record<string, string> = {
   loan: 'สินเชื่อ', grant: 'หน่วยงานให้ทุน / บริการอื่น ๆ',
 }
+
 type Pkg = {
   id: string
   template_type: string
@@ -27,6 +29,9 @@ type Pkg = {
   approval_status: string | null
   profiles: { agency_name: string | null; full_name: string | null } | null
 }
+
+type TabKey = 'pending' | 'approved' | 'rejected'
+
 export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) {
   const router = useRouter()
   const supabase = createClient()
@@ -35,6 +40,7 @@ export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) 
   const [rejectFor, setRejectFor] = useState<string | null>(null)
   const [rejectNote, setRejectNote] = useState('')
   const [detail, setDetail] = useState<Pkg | null>(null)
+  const [tab, setTab] = useState<TabKey>('pending') // default = รออนุมัติ
 
   async function decide(id: string, status: 'approved' | 'rejected' | 'pending') {
     setBusy(id); setMsg('')
@@ -76,23 +82,48 @@ export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) 
     )
   }
 
+  const tabConfig: { key: TabKey; label: string; count: number; badgeBg: string }[] = [
+    { key: 'pending', label: 'บริการที่รออนุมัติ', count: pending.length, badgeBg: pending.length > 0 ? '#dc2626' : '#94a3b8' },
+    { key: 'approved', label: 'บริการที่อนุมัติแล้ว', count: approved.length, badgeBg: '#166534' },
+    { key: 'rejected', label: 'บริการที่ไม่ผ่าน', count: rejected.length, badgeBg: rejected.length > 0 ? '#991b1b' : '#94a3b8' },
+  ]
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {msg && (
         <div style={{ background: '#fee2e2', color: '#991b1b', padding: '8px 12px',
           borderRadius: 8, fontSize: 14 }}>{msg}</div>
       )}
 
+      {/* Tab switcher */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #e2e8f0', flexWrap: 'wrap' }}>
+        {tabConfig.map(t => {
+          const active = tab === t.key
+          return (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 16px', border: 'none', background: 'none', cursor: 'pointer',
+                fontSize: 15, fontWeight: 600,
+                color: active ? '#1e3a8a' : '#64748b',
+                borderBottom: active ? '2px solid #1e3a8a' : '2px solid transparent',
+                marginBottom: -2,
+              }}>
+              {t.label}
+              <span style={{
+                background: t.badgeBg, color: '#fff',
+                fontSize: 12, fontWeight: 700, borderRadius: 12, padding: '2px 9px',
+              }}>
+                {t.count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
       {/* บริการที่รออนุมัติ — บรรทัดเดียว + ปุ่มอนุมัติ/ไม่อนุมัติในแถว */}
-      <div>
-        <h2 style={{ margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          บริการที่รออนุมัติ
-          <span style={{ background: pending.length > 0 ? '#dc2626' : '#94a3b8', color: '#fff',
-            fontSize: 13, fontWeight: 700, borderRadius: 12, padding: '2px 10px' }}>
-            {pending.length}
-          </span>
-        </h2>
-        {pending.length === 0 ? (
+      {tab === 'pending' && (
+        pending.length === 0 ? (
           <div className="card">
             <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '16px 0' }}>
               ไม่มีบริการที่รออนุมัติในขณะนี้
@@ -100,7 +131,7 @@ export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) 
           </div>
         ) : (
           <div className="card" style={{ padding: 0 }}>
-            {pending.map((p, i) => compactRow(p,
+            {pending.map(p => compactRow(p,
               { text: 'รออนุมัติ', bg: '#fef9c3', color: '#a16207' },
               <>
                 <button className="btn btn-sm" disabled={busy === p.id}
@@ -138,19 +169,12 @@ export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) 
               ) : undefined
             ))}
           </div>
-        )}
-      </div>
+        )
+      )}
 
       {/* บริการที่อนุมัติแล้ว */}
-      <div>
-        <h2 style={{ margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          บริการที่อนุมัติแล้ว
-          <span style={{ background: '#166534', color: '#fff',
-            fontSize: 13, fontWeight: 700, borderRadius: 12, padding: '2px 10px' }}>
-            {approved.length}
-          </span>
-        </h2>
-        {approved.length === 0 ? (
+      {tab === 'approved' && (
+        approved.length === 0 ? (
           <div className="card">
             <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '16px 0' }}>
               ยังไม่มีบริการที่อนุมัติ
@@ -166,19 +190,12 @@ export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) 
               </button>
             ))}
           </div>
-        )}
-      </div>
+        )
+      )}
 
       {/* บริการที่ไม่ผ่าน */}
-      <div>
-        <h2 style={{ margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          บริการที่ไม่ผ่าน
-          <span style={{ background: rejected.length > 0 ? '#991b1b' : '#94a3b8', color: '#fff',
-            fontSize: 13, fontWeight: 700, borderRadius: 12, padding: '2px 10px' }}>
-            {rejected.length}
-          </span>
-        </h2>
-        {rejected.length === 0 ? (
+      {tab === 'rejected' && (
+        rejected.length === 0 ? (
           <div className="card">
             <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '16px 0' }}>
               ไม่มีบริการที่ไม่ผ่าน
@@ -194,8 +211,8 @@ export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) 
               </button>
             ))}
           </div>
-        )}
-      </div>
+        )
+      )}
 
       {/* Modal รายละเอียดบริการ */}
       {detail && (
