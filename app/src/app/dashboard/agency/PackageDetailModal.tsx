@@ -35,6 +35,13 @@ const FEE_CHARGED_WHEN_LABELS: Record<string, string> = {
   yearly: 'รายปี',
 }
 
+type ImageMeta = {
+  url: string
+  filename: string
+  size: number | null
+  uploaded_at: string | null
+}
+
 type Pkg = {
   id: string
   template_type: string
@@ -60,7 +67,9 @@ type Pkg = {
   loan_term: string | null
   collateral_required: string | null
   collateral_detail: string | null
-  detail_images: string[] | null
+  cover_banner: ImageMeta | null
+  cover_square: ImageMeta | null
+  detail_images: ImageMeta[] | null
   package_rate_structures?: any | null
 }
 
@@ -143,8 +152,10 @@ export default function PackageDetailModal({
   const ap = APPROVAL_LABELS[pkg.approval_status] ?? APPROVAL_LABELS.pending
 
   const allImages = [
-    ...(pkg.image_url ? [pkg.image_url] : []),
-    ...(pkg.detail_images ?? []),
+    ...(pkg.cover_banner ? [pkg.cover_banner.url] : []),
+    ...(pkg.cover_square ? [pkg.cover_square.url] : []),
+    ...(!pkg.cover_banner && !pkg.cover_square && pkg.image_url ? [pkg.image_url] : []), // fallback ข้อมูลเก่า
+    ...(pkg.detail_images ?? []).map(img => img.url),
   ]
 
   const rate = isLoan ? rateStructureFromRow(pkg.package_rate_structures) : null
