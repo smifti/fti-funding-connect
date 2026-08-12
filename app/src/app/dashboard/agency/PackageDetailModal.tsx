@@ -210,6 +210,29 @@ function ImageSlider({ images }: { images: string[] }) {
   )
 }
 
+// รูปหน้าปกเล็ก ๆ (แบนเนอร์/จตุรัส) พร้อม label กำกับ — คลิกเปิดดูขนาดจริงได้เหมือนกัน
+function CoverThumbnail({ url, label }: { url: string; label: string }) {
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  return (
+    <div style={{ width: 96 }}>
+      <button
+        type="button"
+        onClick={() => setLightboxOpen(true)}
+        title="คลิกเพื่อดูขนาดจริง"
+        style={{
+          width: 96, height: 64, borderRadius: 8, overflow: 'hidden', padding: 0,
+          border: '1px solid #e2e8f0', cursor: 'zoom-in', background: '#f1f5f9', display: 'block',
+        }}>
+        <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </button>
+      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4, textAlign: 'center' }}>{label}</div>
+      {lightboxOpen && (
+        <Lightbox images={[url]} startIndex={0} onClose={() => setLightboxOpen(false)} />
+      )}
+    </div>
+  )
+}
+
 export default function PackageDetailModal({
   pkg, applicantCount, onClose,
 }: {
@@ -221,11 +244,17 @@ export default function PackageDetailModal({
   const [tab, setTab] = useState<'main' | 'rate'>('main')
   const ap = APPROVAL_LABELS[pkg.approval_status] ?? APPROVAL_LABELS.pending
 
-  const allImages = [
-    ...(pkg.cover_banner ? [pkg.cover_banner.url] : []),
-    ...(pkg.cover_square ? [pkg.cover_square.url] : []),
-    ...(!pkg.cover_banner && !pkg.cover_square && pkg.image_url ? [pkg.image_url] : []), // fallback ข้อมูลเก่า
-    ...(pkg.detail_images ?? []).map(img => img.url),
+  // slider หลัก: แสดงเฉพาะภาพรายละเอียดบริการเท่านั้น (ไม่รวมภาพหน้าปก)
+  const detailImageUrls = (pkg.detail_images ?? []).map(img => img.url)
+  // fallback: ถ้าไม่มี detail_images เลยแต่มี image_url เดิม (ข้อมูลเก่าก่อน migrate) ให้ใช้แทนไปก่อน
+  const sliderImages = detailImageUrls.length > 0
+    ? detailImageUrls
+    : (!pkg.cover_banner && !pkg.cover_square && pkg.image_url ? [pkg.image_url] : [])
+
+  // ภาพหน้าปก 2 แบบ แสดงแยกเป็น thumbnail เล็กเหนือ slider หลัก
+  const coverImages: { url: string; label: string }[] = [
+    ...(pkg.cover_banner ? [{ url: pkg.cover_banner.url, label: 'ภาพหน้าปกแบนเนอร์ (2:1)' }] : []),
+    ...(pkg.cover_square ? [{ url: pkg.cover_square.url, label: 'ภาพหน้าปกจตุรัส (1:1)' }] : []),
   ]
 
   const rate = isLoan ? rateStructureFromRow(pkg.package_rate_structures) : null
@@ -294,7 +323,18 @@ export default function PackageDetailModal({
         <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
           {tab === 'main' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              {allImages.length > 0 && <ImageSlider images={allImages} />}
+              {coverImages.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 6 }}>ภาพหน้าปก</div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    {coverImages.map(c => (
+                      <CoverThumbnail key={c.url} url={c.url} label={c.label} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {sliderImages.length > 0 && <ImageSlider images={sliderImages} />}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
