@@ -339,65 +339,89 @@ export default function AgencyPackages({
             </div>
           )}
 
-          {/* หมวดหมู่ข้อเสนอ/บริการ */}
-          <div>
-            <label style={labelStyle}>หมวดหมู่ข้อเสนอ/บริการ *</label>
-            <select
-              style={fieldStyle}
-              value={CATEGORY_OPTIONS.includes(form.category) ? form.category : (form.category ? 'อื่นๆ' : '')}
-              onChange={e => {
-                const v = e.target.value
-                set('category', v === 'อื่นๆ' ? '' : v)
-              }}>
-              <option value="">-- เลือกหมวดหมู่ข้อเสนอ/บริการ --</option>
-              {CATEGORY_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-            {(form.category === '' || !CATEGORY_OPTIONS.includes(form.category)) && (
-              <input
-                style={{ ...fieldStyle, marginTop: 6 }}
-                placeholder="ระบุหมวดหมู่ (กรณีเลือก อื่นๆ)"
-                value={CATEGORY_OPTIONS.includes(form.category) ? '' : form.category}
-                onChange={e => set('category', e.target.value)}
-              />
-            )}
-          </div>
-
-          {/* ประเภทข้อเสนอ/บริการ */}
-          <div>
-            <label style={labelStyle}>ประเภทข้อเสนอ/บริการ *</label>
-            <select
-              style={fieldStyle}
-              value={PACKAGE_TYPE_OPTIONS.includes(form.package_type) ? form.package_type : (form.package_type ? 'อื่นๆ' : '')}
-              onChange={e => {
-                const v = e.target.value
-                set('package_type', v === 'อื่นๆ' ? '' : v)
-                setSectorTags([]) // เปลี่ยนประเภท ล้าง tag เดิมเพื่อไม่ให้ปนกัน
-                setSectorPick('')
-              }}>
-              <option value="">-- เลือกประเภทข้อเสนอ/บริการ --</option>
-              {PACKAGE_TYPE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-            {(form.package_type === '' || !PACKAGE_TYPE_OPTIONS.includes(form.package_type)) && (
-              <input
-                style={{ ...fieldStyle, marginTop: 6 }}
-                placeholder="ระบุประเภทข้อเสนอ/บริการ (กรณีเลือก อื่นๆ)"
-                value={PACKAGE_TYPE_OPTIONS.includes(form.package_type) ? '' : form.package_type}
-                onChange={e => set('package_type', e.target.value)}
-              />
-            )}
-          </div>
-
+          {/* ชื่อข้อเสนอ/บริการ */}
           <div>
             <label style={labelStyle}>ชื่อข้อเสนอ/บริการ / โครงการ *</label>
             <input style={fieldStyle} value={form.title} onChange={e => set('title', e.target.value)}
               placeholder="เช่น สินเชื่อ SME ดอกเบี้ยพิเศษ / โครงการสนับสนุน Digital" />
           </div>
 
+          {/* หมวดหมู่ + ประเภท (แถวเดียวกัน ไม่ยาวเต็มกรอบ) */}
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <label style={labelStyle}>หมวดหมู่ข้อเสนอ/บริการ *</label>
+              <select
+                style={fieldStyle}
+                value={CATEGORY_OPTIONS.includes(form.category) ? form.category : (form.category ? 'อื่นๆ' : '')}
+                onChange={e => {
+                  const v = e.target.value
+                  set('category', v === 'อื่นๆ' ? '' : v)
+                }}>
+                <option value="">-- เลือกหมวดหมู่ --</option>
+                {CATEGORY_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+              {(form.category === '' || !CATEGORY_OPTIONS.includes(form.category)) && (
+                <input
+                  style={{ ...fieldStyle, marginTop: 6 }}
+                  placeholder="ระบุหมวดหมู่ (กรณีเลือก อื่นๆ)"
+                  value={CATEGORY_OPTIONS.includes(form.category) ? '' : form.category}
+                  onChange={e => set('category', e.target.value)}
+                />
+              )}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <label style={labelStyle}>ประเภทข้อเสนอ/บริการ *</label>
+              <select
+                style={fieldStyle}
+                value={PACKAGE_TYPE_OPTIONS.includes(form.package_type) ? form.package_type : (form.package_type ? 'อื่นๆ' : '')}
+                onChange={e => {
+                  const v = e.target.value
+                  set('package_type', v === 'อื่นๆ' ? '' : v)
+                  setSectorTags([]) // เปลี่ยนประเภท ล้าง tag เดิมเพื่อไม่ให้ปนกัน
+                  setSectorPick('')
+                }}>
+                <option value="">-- เลือกประเภท --</option>
+                {PACKAGE_TYPE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+              {(form.package_type === '' || !PACKAGE_TYPE_OPTIONS.includes(form.package_type)) && (
+                <input
+                  style={{ ...fieldStyle, marginTop: 6 }}
+                  placeholder="ระบุประเภท (กรณีเลือก อื่นๆ)"
+                  value={PACKAGE_TYPE_OPTIONS.includes(form.package_type) ? '' : form.package_type}
+                  onChange={e => set('package_type', e.target.value)}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* รายละเอียด / จุดเด่น */}
           <div>
             <label style={labelStyle}>รายละเอียด / จุดเด่น</label>
             <textarea style={{ ...fieldStyle, minHeight: 80, resize: 'vertical' }}
               value={form.description} onChange={e => set('description', e.target.value)}
               placeholder="อธิบายจุดเด่น สิ่งที่ SME จะได้รับ ฯลฯ" />
+          </div>
+
+          {/* คุณสมบัติผู้ได้รับ */}
+          <div>
+            <label style={labelStyle}>คุณสมบัติผู้ได้รับ</label>
+            <textarea style={{ ...fieldStyle, minHeight: 60, resize: 'vertical' }}
+              value={form.eligibility_criteria} onChange={e => set('eligibility_criteria', e.target.value)}
+              placeholder="เช่น เป็น SME จดทะเบียนไม่น้อยกว่า 2 ปี, มีผลประกอบการเป็นบวก" />
+          </div>
+
+          {/* SME ที่เหมาะสม + อุตสาหกรรมเป้าหมาย */}
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>SME ที่เหมาะสม</label>
+              <input style={fieldStyle} value={form.target_sme}
+                onChange={e => set('target_sme', e.target.value)} placeholder="เช่น Startup, Micro SME, SME" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>อุตสาหกรรมเป้าหมาย</label>
+              <input style={fieldStyle} value={form.target_industry}
+                onChange={e => set('target_industry', e.target.value)} placeholder="เช่น อาหาร, พลังงาน, Digital" />
+            </div>
           </div>
 
           {/* ด้านที่เกี่ยวข้อง / ประเภทสินเชื่อ (tag สะสม) */}
@@ -452,36 +476,29 @@ export default function AgencyPackages({
           {/* วงเงินต่ำสุด-สูงสุด */}
           <div style={{ display: 'flex', gap: 12 }}>
             <div style={{ flex: 1 }}>
-              <label style={labelStyle}>วงเงินต่ำสุด (บาท)</label>
+              <label style={labelStyle}>วงเงินที่ได้ต่ำสุด (บาท)</label>
               <input style={fieldStyle} type="number" value={form.min_amount}
                 onChange={e => set('min_amount', e.target.value)} placeholder="เว้นว่างได้" />
             </div>
             <div style={{ flex: 1 }}>
-              <label style={labelStyle}>วงเงินสูงสุด (บาท)</label>
+              <label style={labelStyle}>วงเงินที่ได้สูงสุด (บาท)</label>
               <input style={fieldStyle} type="number" value={form.max_amount}
                 onChange={e => set('max_amount', e.target.value)} placeholder="เว้นว่างได้" />
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>วงเงินสนับสนุน (บาท) — เดิม</label>
-              <input style={fieldStyle} type="number" value={form.price_amount}
-                onChange={e => set('price_amount', e.target.value)} placeholder="เว้นว่างได้" />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>หมายเหตุวงเงิน</label>
-              <input style={fieldStyle} value={form.price_note}
-                onChange={e => set('price_note', e.target.value)} placeholder='เช่น "สูงสุด" / "ติดต่อสอบถาม"' />
-            </div>
+          {/* price_amount เดิม เก็บไว้เป็นช่องเล็กๆ เผื่ออยากใช้ ไม่เด่นเท่าฟิลด์หลัก */}
+          <div>
+            <label style={{ ...labelStyle, fontSize: 12, color: '#94a3b8' }}>วงเงินสนับสนุน (บาท) — ไม่บังคับ</label>
+            <input style={{ ...fieldStyle, maxWidth: 240 }} type="number" value={form.price_amount}
+              onChange={e => set('price_amount', e.target.value)} placeholder="เว้นว่างได้" />
           </div>
 
-          {/* คุณสมบัติผู้ได้รับ */}
+          {/* รายละเอียดวงเงิน (ใช้คอลัมน์ price_note เดิม) */}
           <div>
-            <label style={labelStyle}>คุณสมบัติผู้ได้รับ</label>
-            <textarea style={{ ...fieldStyle, minHeight: 60, resize: 'vertical' }}
-              value={form.eligibility_criteria} onChange={e => set('eligibility_criteria', e.target.value)}
-              placeholder="เช่น เป็น SME จดทะเบียนไม่น้อยกว่า 2 ปี, มีผลประกอบการเป็นบวก" />
+            <label style={labelStyle}>รายละเอียดวงเงิน</label>
+            <input style={fieldStyle} value={form.price_note}
+              onChange={e => set('price_note', e.target.value)} placeholder='เช่น "สูงสุด" / "ติดต่อสอบถาม" / "ตามหลักเกณฑ์ที่ธนาคารกำหนด"' />
           </div>
 
           {/* เฉพาะสินเชื่อ: ดอกเบี้ย / ระยะเวลากู้ / หลักประกัน */}
@@ -530,19 +547,6 @@ export default function AgencyPackages({
             <label style={labelStyle}>สิ่งที่สนับสนุน</label>
             <input style={fieldStyle} value={form.support_items}
               onChange={e => set('support_items', e.target.value)} placeholder="เช่น ค่าที่ปรึกษา, ค่าเครื่องจักร, ค่า Training" />
-          </div>
-
-          <div style={{ display: 'flex', gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>SME ที่เหมาะสม</label>
-              <input style={fieldStyle} value={form.target_sme}
-                onChange={e => set('target_sme', e.target.value)} placeholder="เช่น Startup, Micro SME, SME" />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>อุตสาหกรรมเป้าหมาย (เดิม)</label>
-              <input style={fieldStyle} value={form.target_industry}
-                onChange={e => set('target_industry', e.target.value)} placeholder="เช่น อาหาร, พลังงาน, Digital" />
-            </div>
           </div>
 
           {/* Thumbnail */}
