@@ -253,7 +253,10 @@ export default function ImageCropper({
 
     outCanvas.toBlob(blob => {
       if (!blob) return
-      const croppedFile = new File([blob], file.name, { type: 'image/jpeg' })
+      // ตั้งชื่อไฟล์ผลลัพธ์ให้ระบุขนาดที่ครอปไว้ด้วย กันสับสนเวลาครอปไฟล์ต้นฉบับเดียวกันหลายสัดส่วน (เช่น ทั้งแบนเนอร์และจตุรัส)
+      const baseName = file.name.replace(/\.[^.]+$/, '') || 'image'
+      const outName = `${baseName}-${outputWidth}x${outputHeight}.jpg`
+      const croppedFile = new File([blob], outName, { type: 'image/jpeg' })
       onConfirm(croppedFile)
     }, 'image/jpeg', 0.92)
   }
