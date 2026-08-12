@@ -36,7 +36,7 @@ export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) 
   const [rejectNote, setRejectNote] = useState('')
   const [detail, setDetail] = useState<Pkg | null>(null)  // บริการที่เปิดดู modal
 
-  async function decide(id: string, status: 'approved' | 'rejected') {
+  async function decide(id: string, status: 'approved' | 'rejected' | 'pending') {
     setBusy(id); setMsg('')
     const { error } = await supabase
       .from('packages')
@@ -149,7 +149,7 @@ export default function PackageApprovalManager({ initial }: { initial: Pkg[] }) 
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button className="btn btn-ghost btn-sm" onClick={() => setDetail(p)}>รายละเอียด</button>
                   <button className="btn btn-ghost btn-sm" disabled={busy === p.id}
-                    onClick={() => decide(p.id, 'rejected')}
+                    onClick={() => decide(p.id, 'pending')}
                     style={{ color: '#dc2626' }}>
                     {busy === p.id ? '…' : 'ถอนอนุมัติ'}
                   </button>
