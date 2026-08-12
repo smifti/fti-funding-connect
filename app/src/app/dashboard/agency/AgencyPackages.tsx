@@ -9,6 +9,7 @@ import RateStructureTab, {
   rateStructureToPayload,
   validateRateStructure,
 } from './RateStructureTab'
+import PackageDetailModal from './PackageDetailModal'
 
 // หมวดหมู่ข้อเสนอ/บริการ (ค่าที่เก็บใน DB = ค่าเดียวกับ label ที่แสดง เพราะ category เป็น text ธรรมดา)
 const CATEGORY_OPTIONS = [
@@ -132,6 +133,9 @@ export default function AgencyPackages({
   // อัตราดอกเบี้ย/ค่าบริการทางการเงิน (เฉพาะ package_type = สินเชื่อ)
   const [rateStructure, setRateStructure] = useState<RateStructureForm>(emptyRateStructureForm())
   const [activeFormTab, setActiveFormTab] = useState<'main' | 'rate'>('main')
+
+  // modal ดูรายละเอียดข้อเสนอ/บริการ (read-only)
+  const [detailPkg, setDetailPkg] = useState<Pkg | null>(null)
 
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -356,6 +360,7 @@ export default function AgencyPackages({
   const sectorOptions = isLoan ? LOAN_TYPE_OPTIONS.filter(o => !sectorTags.includes(o)) : []
 
   return (
+    <>
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ margin: 0 }}>ข้อเสนอ/บริการของฉัน ({initial.length})</h2>
@@ -698,7 +703,17 @@ export default function AgencyPackages({
                         <img src={p.image_url} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
                       )}
                       <div>
-                        {p.title}
+                        <button type="button" onClick={() => setDetailPkg(p)}
+                          style={{
+                            border: 'none', background: 'none', padding: 0, cursor: 'pointer',
+                            color: '#1e3a8a', fontWeight: 600, fontSize: 14, textAlign: 'left',
+                            textDecoration: 'underline', textDecorationColor: 'transparent',
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.textDecorationColor = '#1e3a8a')}
+                          onMouseLeave={e => (e.currentTarget.style.textDecorationColor = 'transparent')}
+                          title="คลิกเพื่อดูรายละเอียด">
+                          {p.title}
+                        </button>
                         <div style={{ fontSize: 12, color: 'var(--muted)' }}>
                           {p.category || '—'}
                           {p.package_type && <> · {p.package_type}</>}
@@ -732,6 +747,10 @@ export default function AgencyPackages({
                   <td>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                       <button className="btn btn-ghost btn-sm" disabled={busy}
+                        onClick={() => setDetailPkg(p)}>
+                        รายละเอียด
+                      </button>
+                      <button className="btn btn-ghost btn-sm" disabled={busy}
                         onClick={() => openEdit(p)}>
                         แก้ไข
                       </button>
@@ -757,5 +776,14 @@ export default function AgencyPackages({
         </table>
       )}
     </div>
+
+    {detailPkg && (
+      <PackageDetailModal
+        pkg={detailPkg}
+        applicantCount={applicantCounts[detailPkg.id] ?? 0}
+        onClose={() => setDetailPkg(null)}
+      />
+    )}
+    </>
   )
 }
