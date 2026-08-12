@@ -10,6 +10,7 @@ import RateStructureTab, {
   validateRateStructure,
 } from './RateStructureTab'
 import PackageDetailModal from './PackageDetailModal'
+import ImageCropper from './ImageCropper'
 
 // หมวดหมู่ข้อเสนอ/บริการ (ค่าที่เก็บใน DB = ค่าเดียวกับ label ที่แสดง เพราะ category เป็น text ธรรมดา)
 const CATEGORY_OPTIONS = [
@@ -854,24 +855,45 @@ function formatThaiDate(iso: string | null): string {
 // การ์ดอัปโหลดภาพหน้าปก 1 ช่อง (แบนเนอร์ หรือ จตุรัส) — dropzone ซ้าย + ตัวอย่างภาพปัจจุบันขวา
 // ============================================
 function CoverUploadCard({
-  title, ratioLabel, recommendSize, file, setFile, existing, onRemove,
+  title, ratioLabel, recommendSize, aspectRatio, outputWidth, outputHeight, file, setFile, existing, onRemove,
 }: {
   title: string
   ratioLabel: string
   recommendSize: string
+  aspectRatio: number
+  outputWidth: number
+  outputHeight: number
   file: File | null
   setFile: (f: File | null) => void
   existing: ImageMeta | null
   onRemove: () => void
 }) {
   const [dragOver, setDragOver] = useState(false)
+  const [pendingFile, setPendingFile] = useState<File | null>(null) // ไฟล์ที่เพิ่งเลือก รอ crop ยืนยันก่อนถึงจะใช้จริง
   const preview = file ? URL.createObjectURL(file) : existing?.url ?? null
   const hasUploaded = !!(file || existing)
 
   const labelStyle = { fontSize: 13, color: '#475569', fontWeight: 500 } as const
 
+  function handlePickFile(f: File | null) {
+    if (!f) return
+    // บังคับให้ crop ก่อนเสมอ — ยังไม่ set เป็นไฟล์จริง จนกว่าจะกดยืนยันใน cropper
+    setPendingFile(f)
+  }
+
   return (
     <div>
+      {pendingFile && (
+        <ImageCropper
+          file={pendingFile}
+          aspectRatio={aspectRatio}
+          outputWidth={outputWidth}
+          outputHeight={outputHeight}
+          title={title}
+          onCancel={() => setPendingFile(null)}
+          onConfirm={croppedFile => { setFile(croppedFile); setPendingFile(null) }}
+        />
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <label style={labelStyle}>{title}</label>
         <span style={{
@@ -893,7 +915,7 @@ function CoverUploadCard({
           onDrop={e => {
             e.preventDefault(); setDragOver(false)
             const f = e.dataTransfer.files?.[0]
-            if (f && f.type.startsWith('image/')) setFile(f)
+            if (f && f.type.startsWith('image/')) handlePickFile(f)
           }}
           style={{
             flex: '1 1 200px', cursor: 'pointer', textAlign: 'center',
@@ -908,7 +930,7 @@ function CoverUploadCard({
           <div style={{ color: '#2563eb', fontWeight: 600 }}>หรือคลิกเพื่อเลือกไฟล์</div>
           <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>(อัปโหลดได้ 1 ภาพ)</div>
           <input type="file" accept="image/*" style={{ display: 'none' }}
-            onChange={e => setFile(e.target.files?.[0] ?? null)} />
+            onChange={e => { handlePickFile(e.target.files?.[0] ?? null); e.target.value = '' }} />
         </label>
 
         {/* ตัวอย่างภาพปัจจุบัน */}
@@ -1001,6 +1023,9 @@ function ImagesTab({
             title="1) ภาพหน้าปกแนวยาว (แบนเนอร์)"
             ratioLabel="2:1"
             recommendSize="1200 x 600 px (กว้าง x สูง)"
+            aspectRatio={2 / 1}
+            outputWidth={1200}
+            outputHeight={600}
             file={coverBannerFile}
             setFile={setCoverBannerFile}
             existing={coverBannerExisting}
@@ -1010,6 +1035,9 @@ function ImagesTab({
             title="2) ภาพหน้าปกจตุรัส (สี่เหลี่ยมจัตุรัส)"
             ratioLabel="1:1"
             recommendSize="1080 x 1080 px (กว้าง x สูง)"
+            aspectRatio={1 / 1}
+            outputWidth={1080}
+            outputHeight={1080}
             file={coverSquareFile}
             setFile={setCoverSquareFile}
             existing={coverSquareExisting}
