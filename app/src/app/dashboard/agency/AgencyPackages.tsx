@@ -8,8 +8,8 @@ import RateStructureTab, {
   rateStructureFromRow,
   rateStructureToPayload,
   validateRateStructure,
-} from './RateStructureTab'
-import PackageDetailModal from './PackageDetailModal'
+} from '../shared-packages/RateStructureTab'
+import PackageDetailModal from '../shared-packages/PackageDetailModal'
 import ImageCropper from './ImageCropper'
 
 // หมวดหมู่ข้อเสนอ/บริการ (ค่าที่เก็บใน DB = ค่าเดียวกับ label ที่แสดง เพราะ category เป็น text ธรรมดา)
