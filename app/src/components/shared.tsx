@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
+
 export const CATEGORY_LABELS: Record<string, string> = {
   credit: 'สินเชื่อ',
   innovation: 'นวัตกรรม',
@@ -23,15 +24,18 @@ export const ROLE_LABELS: Record<string, string> = {
   expert: 'ที่ปรึกษา / ผู้เชี่ยวชาญ',
   admin: 'ส.อ.ท. / ผู้ดูแลระบบ',
 }
+
 export function Badge({ status }: { status: string }) {
   return <span className={`badge b-${status}`}>{STATUS_LABELS[status] ?? status}</span>
 }
+
 async function signOut() {
   'use server'
   const supabase = await createClient()
   await supabase.auth.signOut()
   redirect('/login')
 }
+
 // นับจำนวนแพ็กเกจที่รออนุมัติ (สำหรับ admin/expert)
 async function getPendingCount(): Promise<number> {
   const supabase = await createClient()
@@ -41,9 +45,11 @@ async function getPendingCount(): Promise<number> {
     .eq('approval_status', 'pending')
   return count ?? 0
 }
+
 export async function TopBar({ role }: { role: string }) {
   const isReviewer = role === 'admin' || role === 'expert'
   const pendingCount = isReviewer ? await getPendingCount() : 0
+
   return (
     <div className="topbar">
       <div className="container">
@@ -83,6 +89,12 @@ export async function TopBar({ role }: { role: string }) {
                 🔍 ติดตามกิจกรรม
               </a>
             </>
+          )}
+          {role === 'admin' && (
+            <a href="/dashboard/system-settings" className="btn btn-ghost btn-sm"
+              style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
+              ⚙️ ตั้งค่าระบบ
+            </a>
           )}
           <form action={signOut}>
             <button className="btn btn-ghost btn-sm" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
