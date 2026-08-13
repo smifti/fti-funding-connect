@@ -269,14 +269,13 @@ export default function AgencyApplicants({
                         const colorKey = st === 'pending' && open ? 'active' : st
                         const c = STATE_COLOR[colorKey]
 
-                        // คำนวณสถานะ SLA ของ "เส้นก่อนหน้าหมุดนี้" (คือช่วงเวลาของหมุดก่อนหน้า i-1)
-                        // เส้นนี้แสดง SLA เมื่อหมุดก่อนหน้า (i-1) ยังไม่ passed (กำลังดำเนินการอยู่)
+                        // คำนวณสถานะ SLA ของ "เส้นที่นำไปสู่หมุดนี้" (ช่วงเวลานับตั้งแต่หมุดก่อนหน้า i-1 ผ่าน จนถึงตอนนี้)
+                        // เส้นนี้แสดง SLA เมื่อหมุดปลายทาง (i) เอง ยังไม่ passed แต่เปิดให้กดได้แล้ว (คือกำลังอยู่ในช่วงเวลานี้)
                         let lineSla: ReturnType<typeof getSlaStatus> | null = null
                         let lineIsActive = false
                         if (i > 0) {
                           const prevKey = STEPS[i - 1].key
-                          const prevPassed = steps[prevKey]?.state === 'passed'
-                          lineIsActive = !prevPassed && isStepOpen(steps, i - 1)
+                          lineIsActive = st !== 'passed' && open
                           if (lineIsActive) {
                             // หาว่าเส้นนี้คือ SLA ช่วงไหน (1, 2, หรือ 3) ตาม prevKey
                             let startedAtStr: string | null = null
@@ -300,14 +299,15 @@ export default function AgencyApplicants({
                         return (
                           <div key={step.key} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
                             {i > 0 && (
-                              steps[STEPS[i - 1].key]?.state === 'passed' ? (
-                                // เส้นที่ผ่านแล้ว — เขียวทึบนิ่ง เหมือนเดิม
+                              st === 'passed' ? (
+                                // หมุดปลายทาง (หมุดนี้เอง) ผ่านแล้ว — เส้นนำไปสู่หมุดนี้จบสมบูรณ์ → เขียวทึบนิ่ง
                                 <div style={{ position: 'absolute', top: 15, left: '-50%', width: '100%', height: 3,
                                   background: '#16a34a' }} />
                               ) : lineSla ? (
-                                // เส้นกำลังดำเนินการ — SLA progress bar พร้อม animation + สีไล่ตาม % + เลขวันกำกับ
+                                // หมุดปลายทางยังไม่ผ่าน (pending/active) และมีข้อมูลเริ่มนับ SLA แล้ว — แสดง progress bar
                                 <SlaLine sla={lineSla} />
                               ) : (
+                                // ยังไปไม่ถึงช่วงนี้ (หมุดก่อนหน้ายังไม่ผ่าน) หรือยังไม่มีเวลาเริ่มนับ — เทาทึบนิ่ง
                                 <div style={{ position: 'absolute', top: 15, left: '-50%', width: '100%', height: 3,
                                   background: '#e2e8f0' }} />
                               )
