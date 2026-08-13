@@ -2,6 +2,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
+import {
+  buildHolidaySet, getSlaStatus, getStep3SlaDays, getSlaColor, formatDaysRemaining,
+  SlaConfig,
+} from '@/lib/sla'
 
 const STEPS = [
   { key: 'submitted', label: 'ยื่นสมัคร' },
@@ -35,9 +39,13 @@ type App = {
   status: string
   steps: Record<string, StepState>
   created_at: string
-  packages: { title: string; category: string } | null
+  packages: { title: string; category: string; min_amount?: number | null; max_amount?: number | null } | null
   sme_profiles: { owner_id: string | null; company_name: string | null; province: string | null; sme_one_id: string | null } | null
   application_logs?: LogRow[]
+  // เวลาเริ่มของแต่ละขั้น สำหรับคำนวณ SLA
+  step1_started_at: string | null
+  step2_started_at: string | null
+  step3_started_at: string | null
 }
 
 // กลุ่มของผู้รับบริการ 1 ราย (จัดกลุ่มด้วย owner_id) ที่อาจมีหลายใบสมัคร/บริการ
@@ -59,6 +67,7 @@ const STATE_COLOR = {
 
 export default function AgencyApplicants({
   initial, currentUser, filterPackageId, filterPackageTitle, onClearFilter, allPackages,
+  slaConfig, holidays,
 }: {
   initial: App[]
   currentUser: { id: string; name: string; role: string }
@@ -66,6 +75,8 @@ export default function AgencyApplicants({
   filterPackageTitle?: string | null
   onClearFilter?: () => void
   allPackages?: { id: string; title: string }[]
+  slaConfig: SlaConfig
+  holidays: string[] // array ของวันที่ YYYY-MM-DD
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -76,6 +87,8 @@ export default function AgencyApplicants({
   const [showLog, setShowLog] = useState<string | null>(null)
   const [localFilter, setLocalFilter] = useState<string | null>(filterPackageId ?? null)
 
+  const holidaySet = buildHolidaySet(holidays)
+
   function overallStatus(steps: Record<string, StepState>): string {
     if (Object.values(steps).some(s => s.state === 'failed')) return 'rejected'
     if (steps.completed?.state === 'passed') return 'completed'
@@ -85,13 +98,25 @@ export default function AgencyApplicants({
   async function setStep(app: App, stepKey: string, state: StepState['state'], note: string | null) {
     setBusy(app.id); setMsg('')
     const newSteps = { ...app.steps, [stepKey]: { state, ...(note ? { note } : {}) } }
+
+    const updatePayload: any = {
+      steps: newSteps,
+      status: overallStatus(newSteps),
+      updated_at: new Date().toISOString(),
+    }
+
+    // ถ้ากด "ผ่าน" ให้บันทึกเวลาเริ่มของขั้นถัดไป (สำหรับเริ่มนับ SLA ของขั้นถัดไป)
+    if (state === 'passed') {
+      const idx = STEPS.findIndex(s => s.key === stepKey)
+      const nextStep = STEPS[idx + 1]
+      const now = new Date().toISOString()
+      if (nextStep?.key === 'screening') updatePayload.step2_started_at = now
+      else if (nextStep?.key === 'in_progress') updatePayload.step3_started_at = now
+    }
+
     const { error } = await supabase
       .from('package_applications')
-      .update({
-        steps: newSteps,
-        status: overallStatus(newSteps),
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', app.id)
     if (error) { setBusy(null); setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
     await supabase.from('application_logs').insert({
@@ -243,11 +268,49 @@ export default function AgencyApplicants({
                         // ไม่ใช้สีขาวเฉยๆ เพราะจุดนี้เป็นจุดที่ต้องกดกำหนดสถานะต่อไป
                         const colorKey = st === 'pending' && open ? 'active' : st
                         const c = STATE_COLOR[colorKey]
+
+                        // คำนวณสถานะ SLA ของ "เส้นก่อนหน้าหมุดนี้" (คือช่วงเวลาของหมุดก่อนหน้า i-1)
+                        // เส้นนี้แสดง SLA เมื่อหมุดก่อนหน้า (i-1) ยังไม่ passed (กำลังดำเนินการอยู่)
+                        let lineSla: ReturnType<typeof getSlaStatus> | null = null
+                        let lineIsActive = false
+                        if (i > 0) {
+                          const prevKey = STEPS[i - 1].key
+                          const prevPassed = steps[prevKey]?.state === 'passed'
+                          lineIsActive = !prevPassed && isStepOpen(steps, i - 1)
+                          if (lineIsActive) {
+                            // หาว่าเส้นนี้คือ SLA ช่วงไหน (1, 2, หรือ 3) ตาม prevKey
+                            let startedAtStr: string | null = null
+                            let slaDays = 0
+                            if (prevKey === 'submitted') {
+                              startedAtStr = a.step1_started_at
+                              slaDays = slaConfig.step1_days
+                            } else if (prevKey === 'screening') {
+                              startedAtStr = a.step2_started_at
+                              slaDays = slaConfig.step2_days
+                            } else if (prevKey === 'in_progress') {
+                              startedAtStr = a.step3_started_at
+                              slaDays = getStep3SlaDays(slaConfig, a.packages?.max_amount ?? null)
+                            }
+                            if (startedAtStr) {
+                              lineSla = getSlaStatus(new Date(startedAtStr), slaDays, holidaySet)
+                            }
+                          }
+                        }
+
                         return (
                           <div key={step.key} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
                             {i > 0 && (
-                              <div style={{ position: 'absolute', top: 15, left: '-50%', width: '100%', height: 3,
-                                background: (steps[STEPS[i - 1].key]?.state === 'passed') ? '#16a34a' : '#e2e8f0' }} />
+                              steps[STEPS[i - 1].key]?.state === 'passed' ? (
+                                // เส้นที่ผ่านแล้ว — เขียวทึบนิ่ง เหมือนเดิม
+                                <div style={{ position: 'absolute', top: 15, left: '-50%', width: '100%', height: 3,
+                                  background: '#16a34a' }} />
+                              ) : lineSla ? (
+                                // เส้นกำลังดำเนินการ — SLA progress bar พร้อม animation + สีไล่ตาม % + เลขวันกำกับ
+                                <SlaLine sla={lineSla} />
+                              ) : (
+                                <div style={{ position: 'absolute', top: 15, left: '-50%', width: '100%', height: 3,
+                                  background: '#e2e8f0' }} />
+                              )
                             )}
                             <button
                               disabled={!clickable}
@@ -359,4 +422,41 @@ function chipStyle(active: boolean) {
     color: active ? '#fff' : '#475569',
     fontWeight: active ? 600 : 400,
   } as const
+}
+
+// เส้นเชื่อมระหว่างหมุดที่กำลังดำเนินการ (ยังไม่ passed) — progress bar ไล่สีตาม % SLA พร้อม animation และเลขวันกำกับ
+function SlaLine({ sla }: { sla: ReturnType<typeof getSlaStatus> }) {
+  const color = getSlaColor(sla.percentUsed)
+  const fillPercent = Math.min(sla.percentUsed, 100) // แถบสีเติมเต็มที่ 100% แม้เกิน SLA (ไม่ล้นเส้น)
+
+  return (
+    <div style={{
+      position: 'absolute', top: 15, left: '-50%', width: '100%', height: 3,
+      background: '#e2e8f0', overflow: 'visible',
+    }}>
+      {/* แถบสีที่ไล่ตาม % เวลาใช้ไป พร้อม shimmer animation บอกว่ากำลังดำเนินอยู่ */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, height: '100%',
+        width: `${fillPercent}%`, background: color.bg,
+        backgroundImage: `linear-gradient(90deg, ${color.bg} 0%, rgba(255,255,255,0.6) 50%, ${color.bg} 100%)`,
+        backgroundSize: '200% 100%',
+        animation: 'sla-shimmer 1.6s linear infinite',
+        borderRadius: 2,
+      }} />
+      {/* เลขจำนวนวันกำกับกลางเส้น */}
+      <div style={{
+        position: 'absolute', top: -9, left: '50%', transform: 'translateX(-50%)',
+        background: color.bg, color: color.text, fontSize: 10, fontWeight: 700,
+        padding: '1px 6px', borderRadius: 8, whiteSpace: 'nowrap',
+      }}>
+        {formatDaysRemaining(sla.daysRemaining)}
+      </div>
+      <style>{`
+        @keyframes sla-shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
+    </div>
+  )
 }
