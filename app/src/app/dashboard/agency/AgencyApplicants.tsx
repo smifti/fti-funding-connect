@@ -273,42 +273,52 @@ export default function AgencyApplicants({
                         // เส้นนี้แสดง SLA เมื่อหมุดปลายทาง (i) เอง ยังไม่ passed แต่เปิดให้กดได้แล้ว (คือกำลังอยู่ในช่วงเวลานี้)
                         let lineSla: ReturnType<typeof getSlaStatus> | null = null
                         let lineIsActive = false
+                        // วันที่ครบกำหนดของหมุดนี้ (แสดงเหนือหมุด) — คำนวณไม่ว่าหมุดจะ passed หรือ active ก็ตาม
+                        // ต่างจาก lineSla ตรงที่ยังต้องใช้แสดงผลแม้หมุด passed ไปแล้ว (โชว์ค้างไว้เป็นข้อมูลอ้างอิง)
+                        let stepDeadline: Date | null = null
                         if (i > 0) {
                           const prevKey = STEPS[i - 1].key
                           lineIsActive = st !== 'passed' && open
-                          if (lineIsActive) {
-                            // หาว่าเส้นนี้คือ SLA ช่วงไหน (1, 2, หรือ 3) ตาม prevKey
-                            let startedAtStr: string | null = null
-                            let slaDays = 0
-                            if (prevKey === 'submitted') {
-                              startedAtStr = a.step1_started_at
-                              slaDays = slaConfig.step1_days
-                            } else if (prevKey === 'screening') {
-                              startedAtStr = a.step2_started_at
-                              slaDays = slaConfig.step2_days
-                            } else if (prevKey === 'in_progress') {
-                              startedAtStr = a.step3_started_at
-                              slaDays = getStep3SlaDays(slaConfig, a.packages?.max_amount ?? null)
-                            }
-                            if (startedAtStr) {
-                              lineSla = getSlaStatus(new Date(startedAtStr), slaDays, holidaySet)
-                            }
+
+                          let startedAtStr: string | null = null
+                          let slaDays = 0
+                          if (prevKey === 'submitted') {
+                            startedAtStr = a.step1_started_at
+                            slaDays = slaConfig.step1_days
+                          } else if (prevKey === 'screening') {
+                            startedAtStr = a.step2_started_at
+                            slaDays = slaConfig.step2_days
+                          } else if (prevKey === 'in_progress') {
+                            startedAtStr = a.step3_started_at
+                            slaDays = getStep3SlaDays(slaConfig, a.packages?.max_amount ?? null)
+                          }
+
+                          if (startedAtStr && open) {
+                            const sla = getSlaStatus(new Date(startedAtStr), slaDays, holidaySet)
+                            stepDeadline = sla.deadline
+                            if (lineIsActive) lineSla = sla
                           }
                         }
 
                         return (
                           <div key={step.key} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
+                            {/* วันที่กำกับเหนือหมุด: หมุดแรก = วันที่ยื่นจริง, หมุดอื่น = วันที่ครบกำหนด (ถ้ามีข้อมูล) */}
+                            <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 4, minHeight: 14 }}>
+                              {i === 0
+                                ? formatShortThaiDate(a.step1_started_at ?? a.created_at)
+                                : (stepDeadline ? `กำหนด ${formatShortThaiDate(stepDeadline.toISOString())}` : '')}
+                            </div>
                             {i > 0 && (
                               st === 'passed' ? (
                                 // หมุดปลายทาง (หมุดนี้เอง) ผ่านแล้ว — เส้นนำไปสู่หมุดนี้จบสมบูรณ์ → เขียวทึบนิ่ง
-                                <div style={{ position: 'absolute', top: 15, left: '-50%', width: '100%', height: 3,
+                                <div style={{ position: 'absolute', top: 33, left: '-50%', width: '100%', height: 3,
                                   background: '#16a34a' }} />
                               ) : lineSla ? (
                                 // หมุดปลายทางยังไม่ผ่าน (pending/active) และมีข้อมูลเริ่มนับ SLA แล้ว — แสดง progress bar
                                 <SlaLine sla={lineSla} />
                               ) : (
                                 // ยังไปไม่ถึงช่วงนี้ (หมุดก่อนหน้ายังไม่ผ่าน) หรือยังไม่มีเวลาเริ่มนับ — เทาทึบนิ่ง
-                                <div style={{ position: 'absolute', top: 15, left: '-50%', width: '100%', height: 3,
+                                <div style={{ position: 'absolute', top: 33, left: '-50%', width: '100%', height: 3,
                                   background: '#e2e8f0' }} />
                               )
                             )}
@@ -414,6 +424,16 @@ export default function AgencyApplicants({
   )
 }
 
+// แสดงวันที่แบบสั้น (วัน/เดือน/ปี พ.ศ. 2 หลัก) สำหรับกำกับเหนือหมุด — กระชับ ไม่กินพื้นที่มาก
+function formatShortThaiDate(iso: string): string {
+  const d = new Date(iso)
+  const buddhistYear = d.getFullYear() + 543
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yy = String(buddhistYear).slice(-2)
+  return `${dd}/${mm}/${yy}`
+}
+
 function chipStyle(active: boolean) {
   return {
     padding: '6px 14px', fontSize: 13, borderRadius: 20, cursor: 'pointer',
@@ -431,7 +451,7 @@ function SlaLine({ sla }: { sla: ReturnType<typeof getSlaStatus> }) {
 
   return (
     <div style={{
-      position: 'absolute', top: 15, left: '-50%', width: '100%', height: 3,
+      position: 'absolute', top: 33, left: '-50%', width: '100%', height: 3,
       background: '#e2e8f0', overflow: 'visible',
     }}>
       {/* แถบสีที่ไล่ตาม % เวลาใช้ไป พร้อม shimmer animation บอกว่ากำลังดำเนินอยู่ */}
