@@ -7,6 +7,7 @@ import AgencyPackages from './AgencyPackages'
 import AgencyApplicants from './AgencyApplicants'
 import AgencyOverview from './AgencyOverview'
 import ChangePassword from '@/components/ChangePassword'
+import { SlaConfig } from '@/lib/sla'
 
 const CATEGORY_LABELS: Record<string, string> = {
   credit: 'สินเชื่อ', innovation: 'นวัตกรรม', management: 'บริหารจัดการ',
@@ -36,6 +37,7 @@ type Profile = {
 
 export default function AgencyTabs({
   profile, requests, smeList, packages, applicants, currentUser, applicantCounts,
+  slaConfig, holidays,
 }: {
   profile: Profile
   requests: any[]
@@ -44,6 +46,8 @@ export default function AgencyTabs({
   applicants: any[]
   currentUser: { id: string; name: string; role: string }
   applicantCounts: Record<string, number>
+  slaConfig: SlaConfig
+  holidays: string[]
 }) {
   const [tab, setTab] = useState<'overview' | 'packages' | 'profile' | 'sme' | 'settings'>('overview')
   const [filterPkg, setFilterPkg] = useState<string | null>(null)
@@ -98,7 +102,8 @@ export default function AgencyTabs({
         <AgencyApplicants initial={applicants} currentUser={currentUser}
           filterPackageId={filterPkg} filterPackageTitle={filterPkgTitle}
           onClearFilter={() => { setFilterPkg(null); setFilterPkgTitle(null) }}
-          allPackages={packages.map((p: any) => ({ id: p.id, title: p.title }))} />
+          allPackages={packages.map((p: any) => ({ id: p.id, title: p.title }))}
+          slaConfig={slaConfig} holidays={holidays} />
       )}
 
       {tab === 'packages' && (
