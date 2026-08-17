@@ -3,7 +3,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
+
 type RoleType = 'sme' | 'agency' | 'expert'
+
 const PROVINCES = [
   'กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา',
   'ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก',
@@ -30,21 +32,34 @@ export default function RegisterPage() {
   const [ok, setOk] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-
   const set = (k: string) => (e: any) => setForm({ ...form, [k]: e.target.value })
+
   const roleDesc = roleType === 'sme' ? 'ยื่นคำขอรับการสนับสนุน'
     : roleType === 'agency' ? 'สถาบันการเงิน, หน่วยงานภาครัฐ, หน่วยร่วมดำเนินการ ฯลฯ (รอ ส.อ.ท. อนุมัติ)'
     : 'คัดกรองคำขอ (รอ ส.อ.ท. อนุมัติ)'
 
+  // ส่งอีเมลต้อนรับหลังลงทะเบียนสำเร็จ (เฉพาะ SME เท่านั้น — agency/expert ยังต้องรอ admin อนุมัติ ไม่ส่งอีเมล)
+  // ไม่ block การลงทะเบียนถ้าส่งอีเมลไม่สำเร็จ (แค่ log ไว้เฉยๆ เพราะ signUp() ผ่านไปแล้ว ผู้ใช้ควรลงทะเบียนสำเร็จอยู่ดี)
+  async function sendWelcomeEmailIfSme() {
+    if (roleType !== 'sme') return
+    try {
+      await fetch('/api/send-welcome-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email, name: form.coordName }),
+      })
+    } catch {
+      // เงียบไว้ — ไม่ต้องแจ้ง error ให้ผู้ใช้เห็น เพราะการลงทะเบียนสำเร็จแล้ว ไม่ควรทำให้ผู้ใช้กังวล
+    }
+  }
+
   async function onSubmit() {
     setErr(''); setOk('')
-
     // บังคับกรอกเบอร์โทร สำหรับผู้ให้บริการ + ที่ปรึกษา
     if ((roleType === 'agency' || roleType === 'expert') && form.coordPhone.trim() === '') {
       setErr('กรุณากรอกเบอร์โทรศัพท์')
       return
     }
-
     setLoading(true)
     const companyName = roleType === 'sme' ? form.companyName : form.orgName
 
@@ -79,6 +94,7 @@ export default function RegisterPage() {
         },
       },
     })
+
     if (error) {
       setLoading(false)
       const msg = error.message || ''
@@ -93,6 +109,10 @@ export default function RegisterPage() {
     }
 
     setLoading(false)
+
+    // ส่งอีเมลต้อนรับ (เฉพาะ SME) — ทำแบบ fire-and-forget ไม่รอผลลัพธ์ ไม่ block หน้าจอ
+    sendWelcomeEmailIfSme()
+
     if (roleType === 'sme') {
       setOk('ลงทะเบียนสำเร็จ — สามารถเพิ่มข้อมูลกิจการเต็มได้ภายหลังในหน้าโปรไฟล์ กำลังพาไปหน้าเข้าสู่ระบบ')
     } else {
@@ -108,7 +128,6 @@ export default function RegisterPage() {
         <p className="sub">เลือกประเภทผู้ใช้ แล้วกรอกข้อมูลเพื่อสมัคร</p>
         {err && <div className="alert alert-err">{err}</div>}
         {ok && <div className="alert alert-ok">{ok}</div>}
-
         <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 4, borderRadius: 10, marginBottom: 6 }}>
           {(['sme', 'agency', 'expert'] as RoleType[]).map(v => (
             <button key={v} type="button" onClick={() => setRoleType(v)}
@@ -142,7 +161,6 @@ export default function RegisterPage() {
                 {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
-
             <div style={{ fontWeight: 600, fontSize: 14, margin: '16px 0 8px', color: '#1e3a8a' }}>ผู้ประสานงาน</div>
             <div className="field">
               <label>ชื่อ-นามสกุล</label>
@@ -156,12 +174,12 @@ export default function RegisterPage() {
               <label>อีเมลผู้ประสานงาน</label>
               <input value={form.coordEmail} onChange={set('coordEmail')} />
             </div>
-
             <p style={{ fontSize: 12, color: '#94a3b8', margin: '10px 0 0' }}>
               ข้อมูลกิจการเพิ่มเติม (เช่น ประเภทธุรกิจ) และบริการที่ต้องการ กรอกได้ภายหลังในหน้าโปรไฟล์
             </p>
           </>
         )}
+
         {roleType === 'agency' && (
           <>
             <div className="field">
@@ -178,6 +196,7 @@ export default function RegisterPage() {
             </div>
           </>
         )}
+
         {roleType === 'expert' && (
           <>
             <div className="field">
