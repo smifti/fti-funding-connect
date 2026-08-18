@@ -1,6 +1,5 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 
@@ -19,7 +18,6 @@ const PROVINCES = [
 ]
 
 export default function RegisterPage() {
-  const router = useRouter()
   const supabase = createClient()
   const [roleType, setRoleType] = useState<RoleType>('sme')
   const [form, setForm] = useState({
@@ -113,12 +111,9 @@ export default function RegisterPage() {
     // ส่งอีเมลต้อนรับ (เฉพาะ SME) — ทำแบบ fire-and-forget ไม่รอผลลัพธ์ ไม่ block หน้าจอ
     sendWelcomeEmailIfSme()
 
-    if (roleType === 'sme') {
-      setOk('ลงทะเบียนสำเร็จ — สามารถเพิ่มข้อมูลกิจการเต็มได้ภายหลังในหน้าโปรไฟล์ กำลังพาไปหน้าเข้าสู่ระบบ')
-    } else {
-      setOk('ลงทะเบียนสำเร็จ — บัญชีของท่านอยู่ระหว่างรอ ส.อ.ท. อนุมัติสิทธิ์')
-    }
-    setTimeout(() => router.push('/login'), 2800)
+    // เปิดใช้งาน Email Confirmation แล้ว — ผู้ใช้ทุก role ต้องคลิกยืนยันในอีเมลก่อนถึงจะเข้าสู่ระบบได้
+    // จึงไม่ redirect ไปหน้า login ทันที แค่แจ้งให้ไปตรวจสอบอีเมล
+    setOk('กรุณาตรวจสอบอีเมลที่ลงทะเบียน เพื่อยืนยันตัวตนก่อนเข้าสู่ระบบ')
   }
 
   return (
