@@ -21,7 +21,7 @@ export default async function PackageApprovalsPage() {
   const { data: packages } = await supabase
     .from('packages')
     .select(`
-      id, template_type, category, title, description, price_amount, price_note,
+      id, owner_id, template_type, category, title, description, price_amount, price_note,
       funding_type, support_items, target_sme, target_industry, open_period,
       image_url, approval_status, is_active, service_status,
       package_type, related_sectors, min_amount, max_amount, eligibility_criteria,
