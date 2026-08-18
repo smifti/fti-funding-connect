@@ -850,9 +850,10 @@ export default function AgencyPackages({
           </div>
 
           <div>
-            <label style={labelStyle}>สิ่งที่สนับสนุน</label>
-            <input style={fieldStyle} value={form.support_items}
-              onChange={e => set('support_items', e.target.value)} placeholder="เช่น ค่าที่ปรึกษา, ค่าเครื่องจักร, ค่า Training" />
+            <label style={labelStyle}>เหมาะสำหรับ (พิมพ์ทีละบรรทัด)</label>
+            <textarea style={{ ...fieldStyle, minHeight: 80, resize: 'vertical' }}
+              value={form.support_items} onChange={e => set('support_items', e.target.value)}
+              placeholder={'เช่น\nธุรกิจที่ต้องการเงินทุนหมุนเวียน\nธุรกิจที่ต้องการลงทุนเครื่องจักร\nธุรกิจที่ต้องการเพิ่มประสิทธิภาพการผลิต'} />
           </div>
 
           <div>
