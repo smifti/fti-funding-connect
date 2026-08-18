@@ -13,6 +13,7 @@ type ImageMeta = {
 
 type Pkg = {
   id: string
+  owner_id: string
   template_type: string
   category: string
   title: string
@@ -45,6 +46,33 @@ type Pkg = {
 
 type TabKey = 'pending' | 'approved' | 'rejected'
 
+// กลุ่มของบริการทั้งหมดที่เป็นของหน่วยงาน (agency) เดียวกัน ในแท็บสถานะเดียวกัน
+type AgencyGroup = {
+  ownerId: string
+  agencyName: string
+  packages: Pkg[]
+}
+
+// จัดกลุ่ม array ของ packages ตาม owner_id — คงลำดับเดิมของ packages ไว้ (agency แรกที่เจอ มาก่อน)
+function groupByAgency(pkgs: Pkg[]): AgencyGroup[] {
+  const groups: AgencyGroup[] = []
+  const indexByOwner: Record<string, number> = {}
+
+  for (const p of pkgs) {
+    const key = p.owner_id ?? `__no_owner_${p.id}`
+    if (indexByOwner[key] === undefined) {
+      indexByOwner[key] = groups.length
+      groups.push({
+        ownerId: key,
+        agencyName: p.profiles?.agency_name || p.profiles?.full_name || '—',
+        packages: [],
+      })
+    }
+    groups[indexByOwner[key]].packages.push(p)
+  }
+  return groups
+}
+
 export default function PackageApprovalManager({
   initial, applicantCounts,
 }: {
@@ -76,7 +104,11 @@ export default function PackageApprovalManager({
   const approved = initial.filter(p => p.approval_status === 'approved')
   const rejected = initial.filter(p => p.approval_status === 'rejected')
 
-  // แถวบรรทัดเดียว
+  const pendingGroups = groupByAgency(pending)
+  const approvedGroups = groupByAgency(approved)
+  const rejectedGroups = groupByAgency(rejected)
+
+  // แถวบรรทัดเดียวของบริการ 1 รายการ (ไม่โชว์ชื่อ agency ซ้ำ เพราะย้ายไปอยู่หัวการ์ดกลุ่มแล้ว)
   function compactRow(p: Pkg, statusLabel: { text: string; bg: string; color: string }, actions: React.ReactNode, extra?: React.ReactNode) {
     return (
       <div key={p.id} style={{ borderTop: '1px solid #f1f5f9' }}>
@@ -84,7 +116,6 @@ export default function PackageApprovalManager({
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 200 }}>
             <span style={{ fontWeight: 600 }}>{p.title}</span>
-            <span style={{ fontSize: 13, color: '#64748b' }}> · {p.profiles?.agency_name || p.profiles?.full_name || '—'}</span>
           </div>
           <span style={{ background: statusLabel.bg, color: statusLabel.color, fontSize: 12,
             padding: '2px 10px', borderRadius: 10, fontWeight: 600, whiteSpace: 'nowrap' }}>
@@ -96,6 +127,24 @@ export default function PackageApprovalManager({
           </div>
         </div>
         {extra}
+      </div>
+    )
+  }
+
+  // การ์ดกลุ่มของหน่วยงาน 1 แห่ง — หัวการ์ดโชว์ชื่อ agency + จำนวนบริการ ข้างในลิสต์บริการทั้งหมดของ agency นั้น
+  function agencyGroupCard(group: AgencyGroup, renderRow: (p: Pkg) => React.ReactNode) {
+    return (
+      <div key={group.ownerId} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{
+          padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+        }}>
+          <span style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{group.agencyName}</span>
+          <span style={{ fontSize: 12, color: '#64748b' }}>{group.packages.length} บริการ</span>
+        </div>
+        <div>
+          {group.packages.map(p => renderRow(p))}
+        </div>
       </div>
     )
   }
@@ -139,17 +188,17 @@ export default function PackageApprovalManager({
         })}
       </div>
 
-      {/* บริการที่รออนุมัติ — บรรทัดเดียว + ปุ่มอนุมัติ/ไม่อนุมัติในแถว */}
+      {/* บริการที่รออนุมัติ — จัดกลุ่มตามหน่วยงาน + ปุ่มอนุมัติ/ไม่อนุมัติในแถว */}
       {tab === 'pending' && (
-        pending.length === 0 ? (
+        pendingGroups.length === 0 ? (
           <div className="card">
             <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '16px 0' }}>
               ไม่มีบริการที่รออนุมัติในขณะนี้
             </p>
           </div>
         ) : (
-          <div className="card" style={{ padding: 0 }}>
-            {pending.map(p => compactRow(p,
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {pendingGroups.map(group => agencyGroupCard(group, p => compactRow(p,
               { text: 'รออนุมัติ', bg: '#fef9c3', color: '#a16207' },
               <>
                 <button className="btn btn-sm" disabled={busy === p.id}
@@ -185,49 +234,49 @@ export default function PackageApprovalManager({
                   </div>
                 </div>
               ) : undefined
-            ))}
+            )))}
           </div>
         )
       )}
 
-      {/* บริการที่อนุมัติแล้ว */}
+      {/* บริการที่อนุมัติแล้ว — จัดกลุ่มตามหน่วยงาน */}
       {tab === 'approved' && (
-        approved.length === 0 ? (
+        approvedGroups.length === 0 ? (
           <div className="card">
             <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '16px 0' }}>
               ยังไม่มีบริการที่อนุมัติ
             </p>
           </div>
         ) : (
-          <div className="card" style={{ padding: 0 }}>
-            {approved.map(p => compactRow(p,
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {approvedGroups.map(group => agencyGroupCard(group, p => compactRow(p,
               { text: 'อนุมัติแล้ว', bg: '#dcfce7', color: '#166534' },
               <button className="btn btn-ghost btn-sm" disabled={busy === p.id}
                 onClick={() => decide(p.id, 'pending')} style={{ color: '#dc2626' }}>
                 {busy === p.id ? '…' : 'ถอนอนุมัติ'}
               </button>
-            ))}
+            )))}
           </div>
         )
       )}
 
-      {/* บริการที่ไม่ผ่าน */}
+      {/* บริการที่ไม่ผ่าน — จัดกลุ่มตามหน่วยงาน */}
       {tab === 'rejected' && (
-        rejected.length === 0 ? (
+        rejectedGroups.length === 0 ? (
           <div className="card">
             <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '16px 0' }}>
               ไม่มีบริการที่ไม่ผ่าน
             </p>
           </div>
         ) : (
-          <div className="card" style={{ padding: 0 }}>
-            {rejected.map(p => compactRow(p,
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {rejectedGroups.map(group => agencyGroupCard(group, p => compactRow(p,
               { text: 'ไม่ผ่าน', bg: '#fee2e2', color: '#991b1b' },
               <button className="btn btn-ghost btn-sm" disabled={busy === p.id}
                 onClick={() => decide(p.id, 'pending')} style={{ color: '#1e3a8a' }}>
                 {busy === p.id ? '…' : 'นำกลับมาพิจารณา'}
               </button>
-            ))}
+            )))}
           </div>
         )
       )}
