@@ -149,7 +149,7 @@ export default function SmePackages({
   }
 
   if (packages.length === 0) {
-    return <p className="empty">ยังไม่มีแพ็กเกจสนับสนุนในระบบ</p>
+    return <p className="empty">ยังไม่มีบริการสนับสนุนในระบบ</p>
   }
 
   const inputStyle = {
@@ -167,7 +167,7 @@ export default function SmePackages({
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
         <input
           style={{ ...inputStyle, flex: 1, minWidth: 200 }}
-          placeholder="ค้นหาแพ็กเกจ / หน่วยงาน / อุตสาหกรรม…"
+          placeholder="ค้นหาบริการ / หน่วยงาน / อุตสาหกรรม…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -197,7 +197,7 @@ export default function SmePackages({
       </div>
 
       {shown.length === 0 ? (
-        <p className="empty">ไม่พบแพ็กเกจที่ตรงกับเงื่อนไข</p>
+        <p className="empty">ไม่พบบริการที่ตรงกับเงื่อนไข</p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {shown.map(p => {
@@ -221,7 +221,7 @@ export default function SmePackages({
                 <button
                   onClick={() => toggleSave(p.id)}
                   disabled={bookmarkBusy === p.id}
-                  title={isSaved ? 'เลิกบันทึก' : 'บันทึกแพ็กเกจนี้'}
+                  title={isSaved ? 'เลิกบันทึก' : 'บันทึกบริการนี้'}
                   style={{
                     position: 'absolute', top: 8, right: 8, zIndex: 1,
                     width: 30, height: 30, borderRadius: '50%', border: 'none',
