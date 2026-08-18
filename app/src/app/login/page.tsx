@@ -1,29 +1,59 @@
 'use client'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
-export default function LoginPage() {
+
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+
+  const justConfirmed = searchParams.get('confirmed') === '1'
+  const confirmError = searchParams.get('confirm_error') === '1'
+
   async function onSubmit() {
     setErr(''); setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    setLoading(false)
-    if (error) { setErr('เข้าสู่ระบบไม่สำเร็จ — ตรวจสอบอีเมลและรหัสผ่าน'); return }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error || !data.user) {
+      setLoading(false)
+      setErr('เข้าสู่ระบบไม่สำเร็จ — ตรวจสอบอีเมลและรหัสผ่าน')
+      return
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, approval_confirmed_at')
+      .eq('id', data.user.id)
+      .single()
+
+    if (profile && (profile.role === 'agency' || profile.role === 'expert') && !profile.approval_confirmed_at) {
+      await supabase.auth.signOut()
+      setLoading(false)
+      setErr('บัญชีของท่านได้รับการอนุมัติแล้ว แต่ยังไม่ได้ยืนยันตัวตน กรุณาตรวจสอบอีเมลที่ระบบส่งให้และกดยืนยันก่อนเข้าสู่ระบบ')
+      return
+    }
+
     router.push('/dashboard')
     router.refresh()
   }
+
   return (
     <div className="auth-wrap">
       <div className="auth-card">
         <h1>FTI SME Funding Connect</h1>
         <p className="sub">แพลตฟอร์มเชื่อมโยง SME ผู้ให้บริการ และที่ปรึกษา เพื่อการสนับสนุนธุรกิจ</p>
+        {justConfirmed && (
+          <div className="alert alert-ok">ยืนยันตัวตนสำเร็จ กรุณาเข้าสู่ระบบ</div>
+        )}
+        {confirmError && (
+          <div className="alert alert-err">ลิงก์ยืนยันไม่ถูกต้องหรือหมดอายุแล้ว กรุณาติดต่อผู้ดูแลระบบ</div>
+        )}
         {err && <div className="alert alert-err">{err}</div>}
         <div className="field">
           <label>อีเมล</label>
@@ -62,5 +92,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   )
 }
