@@ -1276,11 +1276,11 @@ function ImagesTab({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingLeft: 30 }}>
           <CoverUploadCard
             title="1) ภาพหน้าปกแนวยาว (แบนเนอร์)"
-            ratioLabel="2:1"
-            recommendSize="1200 x 600 px (กว้าง x สูง)"
-            aspectRatio={2 / 1}
-            outputWidth={1200}
-            outputHeight={600}
+            ratioLabel="3.2:1"
+            recommendSize="1280 x 400 px (กว้าง x สูง)"
+            aspectRatio={3.2 / 1}
+            outputWidth={1280}
+            outputHeight={400}
             file={coverBannerFile}
             setFile={setCoverBannerFile}
             existing={coverBannerExisting}
