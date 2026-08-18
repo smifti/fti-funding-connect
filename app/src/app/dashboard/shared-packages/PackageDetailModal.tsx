@@ -109,6 +109,38 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
+// การ์ดข้อมูลมีไอคอน — ใช้แสดงคุณสมบัติ/รายละเอียดต่าง ๆ ในแท็บข้อมูลทั่วไป
+function IconCard({ icon, label, value }: { icon: string; label: string; value: React.ReactNode }) {
+  if (value === null || value === undefined || value === '') return null
+  return (
+    <div style={{
+      display: 'flex', gap: 10, alignItems: 'flex-start',
+      background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px',
+    }}>
+      <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{icon}</span>
+      <div>
+        <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: 14, color: '#1e293b', marginTop: 2, fontWeight: 600 }}>{value}</div>
+      </div>
+    </div>
+  )
+}
+
+// รายการเช็คลิสต์สีเขียว — ใช้กับ "จุดเด่น" (แยกทีละบรรทัดจาก description)
+function Checklist({ items }: { items: string[] }) {
+  if (items.length === 0) return null
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {items.map((item, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 14, color: '#334155' }}>
+          <span style={{ color: '#16a34a', fontWeight: 700, flexShrink: 0 }}>✓</span>
+          <span>{item}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function Lightbox({
   images, startIndex, onClose,
 }: {
@@ -230,28 +262,6 @@ function ImageSlider({ images }: { images: string[] }) {
   )
 }
 
-function CoverThumbnail({ url, label }: { url: string; label: string }) {
-  const [lightboxOpen, setLightboxOpen] = useState(false)
-  return (
-    <div style={{ width: 96 }}>
-      <button
-        type="button"
-        onClick={() => setLightboxOpen(true)}
-        title="คลิกเพื่อดูขนาดจริง"
-        style={{
-          width: 96, height: 64, borderRadius: 8, overflow: 'hidden', padding: 0,
-          border: '1px solid #e2e8f0', cursor: 'zoom-in', background: '#f1f5f9', display: 'block',
-        }}>
-        <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      </button>
-      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4, textAlign: 'center' }}>{label}</div>
-      {lightboxOpen && (
-        <Lightbox images={[url]} startIndex={0} onClose={() => setLightboxOpen(false)} />
-      )}
-    </div>
-  )
-}
-
 export default function PackageDetailModal({
   pkg, applicantCount, onClose,
   mode = 'agency',
@@ -286,15 +296,11 @@ export default function PackageDetailModal({
     ? detailImageUrls
     : (!pkg.cover_banner && !pkg.cover_square && pkg.image_url ? [pkg.image_url] : [])
 
-  const coverImages: { url: string; label: string }[] = [
-    ...(pkg.cover_banner ? [{ url: pkg.cover_banner.url, label: 'ภาพหน้าปกแบนเนอร์ (2:1)' }] : []),
-    ...(pkg.cover_square ? [{ url: pkg.cover_square.url, label: 'ภาพหน้าปกจตุรัส (1:1)' }] : []),
-  ]
-
   const rate = isLoan ? rateStructureFromRow(pkg.package_rate_structures) : null
 
   const agency = pkg.profiles?.agencies
   const agencyDisplayName = agency?.name || pkg.profiles?.agency_name || pkg.profiles?.full_name || '—'
+  const agencyLogo = agency?.logo
   const agencyContact = [agency?.contact_phone || pkg.profiles?.phone, agency?.email || pkg.profiles?.agency_email]
     .filter(Boolean).join(' · ')
 
@@ -303,283 +309,327 @@ export default function PackageDetailModal({
     .map(s => s.trim())
     .filter(Boolean)
 
+  // จุดเด่น — แยกทีละบรรทัดจาก description ให้เป็นเช็คลิสต์
+  const highlightList = (pkg.description ?? '')
+    .split('\n')
+    .map(s => s.trim())
+    .filter(Boolean)
+
+  const amountText = pkg.min_amount != null || pkg.max_amount != null
+    ? `${pkg.min_amount != null ? pkg.min_amount.toLocaleString('th-TH') : '—'} - ${pkg.max_amount != null ? pkg.max_amount.toLocaleString('th-TH') : '—'} บาท`
+    : pkg.price_amount != null ? `${pkg.price_amount.toLocaleString('th-TH')} บาท` : null
+
+  const durationText = isLoan ? pkg.loan_term : pkg.open_period
+
   const tabBtnStyle = (active: boolean) => ({
-    padding: '8px 16px', border: 'none', background: 'none', cursor: 'pointer',
-    fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap' as const,
-    color: active ? '#2563eb' : '#94a3b8',
-    borderBottom: active ? '2px solid #2563eb' : '2px solid transparent',
-    marginBottom: -2,
+    padding: '9px 16px', border: 'none', cursor: 'pointer',
+    fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap' as const, borderRadius: 8,
+    color: active ? '#fff' : '#475569',
+    background: active ? '#1e3a8a' : 'transparent',
+    transition: 'all .15s',
   } as const)
 
   return (
     <div
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)',
+        position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 100, padding: 16,
       }}>
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          background: '#fff', borderRadius: 14, width: '100%', maxWidth: 880,
+          position: 'relative',
+          background: '#fff', borderRadius: 16, width: '100%', maxWidth: 980,
           maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
         }}>
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-          padding: '18px 20px 0 20px',
-        }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 19 }}>{pkg.title}</h2>
-            <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
-              โดย: {agencyDisplayName}
-              {mode === 'sme' && agencyContact && <> · {agencyContact}</>}
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
-              {mode !== 'sme' && (
-                <span style={{
-                  background: ap.bg, color: ap.color, fontSize: 12,
-                  padding: '3px 10px', borderRadius: 12,
-                }}>
-                  {ap.text}
-                </span>
-              )}
-              {pkg.approval_status === 'approved' && (
-                <span style={{ fontSize: 12, color: '#64748b' }}>
-                  {SERVICE_LABELS[pkg.service_status] ?? pkg.service_status}
-                </span>
-              )}
-              {mode !== 'sme' && (
-                <span style={{ fontSize: 12, color: '#64748b' }}>· ผู้สมัคร {applicantCount} ราย</span>
-              )}
-            </div>
-          </div>
-          <button onClick={onClose} aria-label="ปิด" style={{
-            border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: '#94a3b8',
-            lineHeight: 1, padding: 4,
-          }}>×</button>
-        </div>
 
-        <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #e2e8f0', padding: '10px 20px 0 20px', overflowX: 'auto' }}>
-          <button onClick={() => setTab('main')} style={tabBtnStyle(tab === 'main')}>ข้อมูลทั่วไป</button>
-          {isLoan && (
-            <button onClick={() => setTab('rate')} style={tabBtnStyle(tab === 'rate')}>
-              📊 อัตราดอกเบี้ย / ค่าธรรมเนียม
-            </button>
-          )}
-          <button onClick={() => setTab('documents')} style={tabBtnStyle(tab === 'documents')}>
-            📄 เอกสารที่ใช้
-          </button>
-          <button onClick={() => setTab('faq')} style={tabBtnStyle(tab === 'faq')}>
-            ❓ คำถามที่พบบ่อย
-          </button>
-        </div>
+        {/* ปุ่มปิด ลอยมุมขวาบนเสมอ */}
+        <button onClick={onClose} aria-label="ปิด" style={{
+          position: 'absolute', top: 24, right: 24, zIndex: 20,
+          width: 32, height: 32, borderRadius: '50%', border: 'none',
+          background: 'rgba(15,23,42,0.55)', color: '#fff', cursor: 'pointer', fontSize: 18,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
+        }}>×</button>
 
-        <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
-          {tab === 'main' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              {coverImages.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 6 }}>ภาพหน้าปก</div>
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    {coverImages.map(c => (
-                      <CoverThumbnail key={c.url} url={c.url} label={c.label} />
-                    ))}
-                  </div>
-                </div>
-              )}
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap' }}>
 
-              {sliderImages.length > 0 && <ImageSlider images={sliderImages} />}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                  <Field label="หมวดหมู่ข้อเสนอ/บริการ" value={pkg.category} />
-                  <Field label="ประเภทข้อเสนอ/บริการ" value={pkg.package_type} />
-                </div>
-
-                <Field label="รายละเอียด / จุดเด่น" value={pkg.description} />
-                <Field label="คุณสมบัติผู้ได้รับ" value={pkg.eligibility_criteria} />
-
-                <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                  <Field label="SME ที่เหมาะสม" value={pkg.target_sme} />
-                  <Field label="อุตสาหกรรมเป้าหมาย" value={pkg.target_industry} />
-                </div>
-
-                {pkg.related_sectors && pkg.related_sectors.length > 0 && (
-                  <div>
-                    <div style={labelStyle}>{isLoan ? 'ประเภทสินเชื่อ' : 'ด้านที่เกี่ยวข้อง'}</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                      {pkg.related_sectors.map(tag => (
-                        <span key={tag} style={{
-                          background: '#e0f2fe', color: '#0369a1', fontSize: 12,
-                          padding: '4px 8px', borderRadius: 12,
-                        }}>
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+            {/* ===== Sidebar ซ้าย ===== */}
+            <div style={{
+              flex: '0 0 260px', minWidth: 240,
+              borderRight: '1px solid #e2e8f0', padding: '24px 20px',
+              display: 'flex', flexDirection: 'column', gap: 16,
+            }}>
+              <div style={{
+                width: 80, height: 80, borderRadius: 14, border: '1px solid #e2e8f0',
+                background: '#f8fafc', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {agencyLogo ? (
+                  <img src={agencyLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                ) : (
+                  <span style={{ fontSize: 28 }}>🏢</span>
                 )}
-
-                <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                  <Field
-                    label="วงเงิน"
-                    value={
-                      pkg.min_amount != null || pkg.max_amount != null
-                        ? `${pkg.min_amount != null ? pkg.min_amount.toLocaleString('th-TH') : '—'} - ${pkg.max_amount != null ? pkg.max_amount.toLocaleString('th-TH') : '—'} บาท`
-                        : pkg.price_amount != null ? `${pkg.price_amount.toLocaleString('th-TH')} บาท` : null
-                    }
-                  />
-                  <Field label="รายละเอียดวงเงิน" value={pkg.price_note} />
-                </div>
-
-                {isLoan && (
-                  <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                    <Field label="ระยะเวลากู้" value={pkg.loan_term} />
-                    <Field label="หลักประกัน" value={pkg.collateral_required} />
-                  </div>
-                )}
-                {isLoan && pkg.collateral_detail && (
-                  <Field label="รายละเอียดหลักประกัน" value={pkg.collateral_detail} />
-                )}
-
-                <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                  <Field label="รูปแบบทุน" value={pkg.funding_type} />
-                  <Field label="ระยะเวลาเปิดรับ" value={pkg.open_period} />
-                </div>
-                <Field label="สิ่งที่สนับสนุน" value={pkg.support_items} />
-              </div>
-            </div>
-          )}
-
-          {tab === 'rate' && rate && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                <Field label="ประเภทการกำหนดอัตราดอกเบี้ย" value={RATE_TYPE_LABELS[rate.rate_type] ?? rate.rate_type} />
-                <Field label="วิธีคิดดอกเบี้ย" value={rate.calculation_method} />
-                <Field label="หน่วยอัตรา" value={RATE_UNIT_LABELS[rate.rate_unit] ?? rate.rate_unit} />
-                <Field label="ข้อมูลอัตรา ณ วันที่" value={rate.rate_as_of_date} />
               </div>
 
               <div>
-                <div style={{ ...labelStyle, marginBottom: 8 }}>รายละเอียดอัตราดอกเบี้ย</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {rate.rate_tiers.map((t, i) => (
-                    <div key={t.id} style={{
-                      border: '1px solid #e2e8f0', borderRadius: 8, padding: 10, fontSize: 13,
-                    }}>
-                      <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                        ช่วงที่ {i + 1}: {t.period_from} – {t.period_to}
-                      </div>
-                      {t.rate_kind === 'fixed' && <div>อัตราคงที่ {t.fixed_rate}{RATE_UNIT_LABELS[rate.rate_unit]}</div>}
-                      {t.rate_kind === 'range' && <div>ช่วงอัตรา {t.range_min} – {t.range_max}{RATE_UNIT_LABELS[rate.rate_unit]}</div>}
-                      {t.rate_kind === 'reference' && (
-                        <div>{t.reference_index} {t.reference_sign} {t.reference_spread}{RATE_UNIT_LABELS[rate.rate_unit]}</div>
-                      )}
-                      {t.rate_kind === 'step' && <div>อัตราขั้นบันได {t.fixed_rate}{RATE_UNIT_LABELS[rate.rate_unit]}</div>}
-                      {t.rate_kind === 'case_by_case' && <div>ตามการพิจารณา</div>}
-                      {t.note && <div style={{ color: '#64748b', marginTop: 2 }}>{t.note}</div>}
-                    </div>
-                  ))}
-                </div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{agencyDisplayName}</div>
+                {mode !== 'sme' && (
+                  <span style={{
+                    display: 'inline-block', marginTop: 6,
+                    background: ap.bg, color: ap.color, fontSize: 12,
+                    padding: '3px 10px', borderRadius: 12,
+                  }}>
+                    {ap.text}
+                  </span>
+                )}
+                {pkg.approval_status === 'approved' && (
+                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>
+                    {SERVICE_LABELS[pkg.service_status] ?? pkg.service_status}
+                  </div>
+                )}
+                {mode !== 'sme' && (
+                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>ผู้สมัคร {applicantCount} ราย</div>
+                )}
               </div>
 
-              <Field label="เงื่อนไข / หมายเหตุอัตราดอกเบี้ย" value={rate.rate_conditions} />
+              {/* ปุ่มติดต่อ/สมัคร */}
+              {mode === 'sme' && (
+                isApplied ? (
+                  <button className="btn" disabled style={{ background: '#dcfce7', color: '#166534', border: 'none' }}>
+                    ✓ สมัครแล้ว
+                  </button>
+                ) : canApply ? (
+                  <button className="btn" disabled={applying} onClick={onApply}>
+                    {applying ? 'กำลังสมัคร…' : 'สนใจ / สมัคร'}
+                  </button>
+                ) : (
+                  <button className="btn" disabled style={{ background: '#f1f5f9', color: '#94a3b8', border: 'none' }}>
+                    {closedLabel ?? 'ปิดรับสมัคร'}
+                  </button>
+                )
+              )}
+              {mode === 'sme' && agencyContact && (
+                <div style={{ fontSize: 12, color: '#64748b' }}>ติดต่อ: {agencyContact}</div>
+              )}
 
-              {rate.fee_items.length > 0 && (
-                <div>
-                  <div style={{ ...labelStyle, marginBottom: 8 }}>ค่าธรรมเนียมและค่าใช้จ่ายที่เกี่ยวข้อง</div>
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                      <thead>
-                        <tr>
-                          <th style={{ textAlign: 'left', padding: '6px 8px' }}>ประเภทค่าธรรมเนียม</th>
-                          <th style={{ textAlign: 'left', padding: '6px 8px' }}>อัตรา/จำนวน</th>
-                          <th style={{ textAlign: 'left', padding: '6px 8px' }}>หน่วย</th>
-                          <th style={{ textAlign: 'left', padding: '6px 8px' }}>เก็บเมื่อไหร่</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rate.fee_items.map(f => (
-                          <tr key={f.id}>
-                            <td style={{ padding: '6px 8px' }}>{f.fee_name}</td>
-                            <td style={{ padding: '6px 8px' }}>{f.amount}</td>
-                            <td style={{ padding: '6px 8px' }}>{FEE_UNIT_LABELS[f.unit] ?? f.unit}</td>
-                            <td style={{ padding: '6px 8px' }}>{FEE_CHARGED_WHEN_LABELS[f.charged_when] ?? f.charged_when}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <IconCard icon="🏦" label="ประเภทบริการ" value={pkg.category} />
+                <IconCard icon="🎯" label="กลุ่มเป้าหมาย" value={pkg.target_sme} />
+                <IconCard icon="🏭" label="อุตสาหกรรมเป้าหมาย" value={pkg.target_industry} />
+                <IconCard icon="💰" label="วงเงิน" value={amountText} />
+                <IconCard icon="📅" label={isLoan ? 'ระยะเวลากู้' : 'ระยะเวลาเปิดรับ'} value={durationText} />
+                {isLoan && <IconCard icon="🛡️" label="หลักประกัน" value={pkg.collateral_required} />}
+              </div>
+            </div>
+
+            {/* ===== เนื้อหาหลักขวา ===== */}
+            <div style={{ flex: '1 1 480px', minWidth: 280, display: 'flex', flexDirection: 'column' }}>
+
+              {/* Hero banner */}
+              {pkg.cover_banner ? (
+                <div style={{ position: 'relative', width: '100%', aspectRatio: '2 / 1', background: '#0f172a' }}>
+                  <img src={pkg.cover_banner.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    background: 'linear-gradient(0deg, rgba(15,23,42,0.75) 0%, rgba(15,23,42,0.1) 60%)',
+                  }} />
+                  <div style={{ position: 'absolute', left: 20, right: 20, bottom: 16, color: '#fff' }}>
+                    <h2 style={{ margin: 0, fontSize: 20, textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}>{pkg.title}</h2>
                   </div>
                 </div>
-              )}
-
-              <Field label="หมายเหตุค่าธรรมเนียม" value={rate.fee_notes} />
-            </div>
-          )}
-
-          {tab === 'documents' && (
-            <div>
-              <h3 style={{ fontSize: 15, margin: '0 0 12px' }}>เอกสารที่ต้องใช้</h3>
-              {documentList.length === 0 ? (
-                <p style={{ fontSize: 13, color: '#94a3b8' }}>ยังไม่มีข้อมูลเอกสารที่ต้องใช้ — กรุณาติดต่อหน่วยงานผู้ให้บริการ</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {documentList.map((doc, i) => (
-                    <div key={i} style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 10,
-                      background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px',
-                      fontSize: 14, color: '#334155',
-                    }}>
-                      <span style={{ color: '#16a34a', flexShrink: 0 }}>✓</span>
-                      <span>{doc}</span>
-                    </div>
-                  ))}
+                <div style={{ padding: '22px 24px 0 24px' }}>
+                  <h2 style={{ margin: 0, fontSize: 20 }}>{pkg.title}</h2>
                 </div>
               )}
-            </div>
-          )}
 
-          {tab === 'faq' && (
-            <div>
-              <h3 style={{ fontSize: 15, margin: '0 0 12px' }}>คำถามที่พบบ่อย</h3>
-              {faqs === null ? (
-                <p style={{ fontSize: 13, color: '#94a3b8' }}>กำลังโหลด…</p>
-              ) : faqs.length === 0 ? (
-                <p style={{ fontSize: 13, color: '#94a3b8' }}>ยังไม่มีคำถามที่พบบ่อยสำหรับบริการนี้</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {faqs.map(f => (
-                    <div key={f.id} style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: '#1e293b', marginBottom: 4 }}>
-                        {f.question}
+              {/* Tabs */}
+              <div style={{
+                display: 'flex', gap: 4, padding: '14px 24px 0 24px', overflowX: 'auto',
+                borderBottom: '1px solid #e2e8f0',
+              }}>
+                <button onClick={() => setTab('main')} style={tabBtnStyle(tab === 'main')}>ข้อมูลทั่วไป</button>
+                {isLoan && (
+                  <button onClick={() => setTab('rate')} style={tabBtnStyle(tab === 'rate')}>
+                    📊 อัตราดอกเบี้ย/ค่าธรรมเนียม
+                  </button>
+                )}
+                <button onClick={() => setTab('documents')} style={tabBtnStyle(tab === 'documents')}>
+                  📄 เอกสารที่ใช้
+                </button>
+                <button onClick={() => setTab('faq')} style={tabBtnStyle(tab === 'faq')}>
+                  ❓ คำถามที่พบบ่อย
+                </button>
+              </div>
+
+              {/* Tab content */}
+              <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                {tab === 'main' && (
+                  <>
+                    {highlightList.length > 0 && (
+                      <div>
+                        <h3 style={{ fontSize: 15, margin: '0 0 10px' }}>จุดเด่น</h3>
+                        <Checklist items={highlightList} />
                       </div>
-                      <div style={{ fontSize: 13, color: '#64748b' }}>{f.answer}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                    )}
 
-        <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          {mode === 'sme' && (
-            isApplied ? (
-              <button className="btn" disabled style={{ background: '#dcfce7', color: '#166534', border: 'none' }}>
-                ✓ สมัครแล้ว
-              </button>
-            ) : canApply ? (
-              <button className="btn btn-sm" disabled={applying} onClick={onApply}>
-                {applying ? 'กำลังสมัคร…' : 'สนใจ / สมัคร'}
-              </button>
-            ) : (
-              <button className="btn btn-sm" disabled style={{ background: '#f1f5f9', color: '#94a3b8', border: 'none' }}>
-                {closedLabel ?? 'ปิดรับสมัคร'}
-              </button>
-            )
-          )}
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>ปิด</button>
+                    {(pkg.cover_square || sliderImages.length > 0) && (
+                      <div>
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: sliderImages.length > 0 ? 10 : 0 }}>
+                          {pkg.cover_square && (
+                            <img src={pkg.cover_square.url} alt="" style={{
+                              width: 96, height: 96, objectFit: 'cover', borderRadius: 10, border: '1px solid #e2e8f0',
+                            }} />
+                          )}
+                        </div>
+                        {sliderImages.length > 0 && <ImageSlider images={sliderImages} />}
+                      </div>
+                    )}
+
+                    <div>
+                      <h3 style={{ fontSize: 15, margin: '0 0 10px' }}>คุณสมบัติและเงื่อนไข</h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+                        <IconCard icon="✅" label="คุณสมบัติผู้ได้รับ" value={pkg.eligibility_criteria} />
+                        <IconCard icon="🎁" label="สิ่งที่สนับสนุน" value={pkg.support_items} />
+                        <IconCard icon="💼" label="รูปแบบทุน" value={pkg.funding_type} />
+                        <IconCard icon="📝" label="รายละเอียดวงเงิน" value={pkg.price_note} />
+                        {isLoan && <IconCard icon="📄" label="รายละเอียดหลักประกัน" value={pkg.collateral_detail} />}
+                      </div>
+                    </div>
+
+                    {pkg.related_sectors && pkg.related_sectors.length > 0 && (
+                      <div>
+                        <div style={labelStyle}>{isLoan ? 'ประเภทสินเชื่อ' : 'ด้านที่เกี่ยวข้อง'}</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                          {pkg.related_sectors.map(tag => (
+                            <span key={tag} style={{
+                              background: '#e0f2fe', color: '#0369a1', fontSize: 12,
+                              padding: '4px 8px', borderRadius: 12,
+                            }}>
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {tab === 'rate' && rate && (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+                      <IconCard icon="%" label="ประเภทอัตรา" value={RATE_TYPE_LABELS[rate.rate_type] ?? rate.rate_type} />
+                      <IconCard icon="🧮" label="วิธีคิดดอกเบี้ย" value={rate.calculation_method} />
+                      <IconCard icon="📐" label="หน่วยอัตรา" value={RATE_UNIT_LABELS[rate.rate_unit] ?? rate.rate_unit} />
+                      <IconCard icon="🗓️" label="ข้อมูลอัตรา ณ วันที่" value={rate.rate_as_of_date} />
+                    </div>
+
+                    <div>
+                      <h3 style={{ fontSize: 15, margin: '0 0 10px' }}>ตารางเปรียบเทียบอัตราดอกเบี้ย</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {rate.rate_tiers.map((t, i) => (
+                          <div key={t.id} style={{
+                            border: '1px solid #e2e8f0', borderRadius: 8, padding: 10, fontSize: 13,
+                          }}>
+                            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                              ช่วงที่ {i + 1}: {t.period_from} – {t.period_to}
+                            </div>
+                            {t.rate_kind === 'fixed' && <div>อัตราคงที่ {t.fixed_rate}{RATE_UNIT_LABELS[rate.rate_unit]}</div>}
+                            {t.rate_kind === 'range' && <div>ช่วงอัตรา {t.range_min} – {t.range_max}{RATE_UNIT_LABELS[rate.rate_unit]}</div>}
+                            {t.rate_kind === 'reference' && (
+                              <div>{t.reference_index} {t.reference_sign} {t.reference_spread}{RATE_UNIT_LABELS[rate.rate_unit]}</div>
+                            )}
+                            {t.rate_kind === 'step' && <div>อัตราขั้นบันได {t.fixed_rate}{RATE_UNIT_LABELS[rate.rate_unit]}</div>}
+                            {t.rate_kind === 'case_by_case' && <div>ตามการพิจารณา</div>}
+                            {t.note && <div style={{ color: '#64748b', marginTop: 2 }}>{t.note}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <Field label="เงื่อนไข / หมายเหตุอัตราดอกเบี้ย" value={rate.rate_conditions} />
+
+                    {rate.fee_items.length > 0 && (
+                      <div>
+                        <h3 style={{ fontSize: 15, margin: '0 0 10px' }}>ค่าธรรมเนียมและค่าใช้จ่ายที่เกี่ยวข้อง</h3>
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                            <thead>
+                              <tr>
+                                <th style={{ textAlign: 'left', padding: '6px 8px' }}>ประเภทค่าธรรมเนียม</th>
+                                <th style={{ textAlign: 'left', padding: '6px 8px' }}>อัตรา/จำนวน</th>
+                                <th style={{ textAlign: 'left', padding: '6px 8px' }}>หน่วย</th>
+                                <th style={{ textAlign: 'left', padding: '6px 8px' }}>เก็บเมื่อไหร่</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rate.fee_items.map(f => (
+                                <tr key={f.id}>
+                                  <td style={{ padding: '6px 8px' }}>{f.fee_name}</td>
+                                  <td style={{ padding: '6px 8px' }}>{f.amount}</td>
+                                  <td style={{ padding: '6px 8px' }}>{FEE_UNIT_LABELS[f.unit] ?? f.unit}</td>
+                                  <td style={{ padding: '6px 8px' }}>{FEE_CHARGED_WHEN_LABELS[f.charged_when] ?? f.charged_when}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    <Field label="หมายเหตุค่าธรรมเนียม" value={rate.fee_notes} />
+                  </>
+                )}
+
+                {tab === 'documents' && (
+                  <div>
+                    <h3 style={{ fontSize: 15, margin: '0 0 12px' }}>เอกสารที่ต้องใช้</h3>
+                    {documentList.length === 0 ? (
+                      <p style={{ fontSize: 13, color: '#94a3b8' }}>ยังไม่มีข้อมูลเอกสารที่ต้องใช้ — กรุณาติดต่อหน่วยงานผู้ให้บริการ</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {documentList.map((doc, i) => (
+                          <div key={i} style={{
+                            display: 'flex', alignItems: 'flex-start', gap: 10,
+                            background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px',
+                            fontSize: 14, color: '#334155',
+                          }}>
+                            <span style={{ color: '#16a34a', flexShrink: 0 }}>✓</span>
+                            <span>{doc}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {tab === 'faq' && (
+                  <div>
+                    <h3 style={{ fontSize: 15, margin: '0 0 12px' }}>คำถามที่พบบ่อย</h3>
+                    {faqs === null ? (
+                      <p style={{ fontSize: 13, color: '#94a3b8' }}>กำลังโหลด…</p>
+                    ) : faqs.length === 0 ? (
+                      <p style={{ fontSize: 13, color: '#94a3b8' }}>ยังไม่มีคำถามที่พบบ่อยสำหรับบริการนี้</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {faqs.map(f => (
+                          <div key={f.id} style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
+                            <div style={{ fontWeight: 600, fontSize: 14, color: '#1e293b', marginBottom: 4 }}>
+                              {f.question}
+                            </div>
+                            <div style={{ fontSize: 13, color: '#64748b' }}>{f.answer}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
