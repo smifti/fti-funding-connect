@@ -1,6 +1,6 @@
 'use client'
-import { useState, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useMemo, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import PackageDetailModal from '../shared-packages/PackageDetailModal'
 
@@ -52,6 +52,7 @@ type Pkg = {
   cover_square: ImageMeta | null
   detail_images: ImageMeta[] | null
   required_documents: string | null
+  is_featured?: boolean
   package_rate_structures?: any | null
   profiles: {
     full_name: string | null
@@ -71,22 +72,36 @@ type Pkg = {
 }
 
 export default function SmePackages({
-  smeId, packages, appliedIds,
+  smeId, packages, appliedIds, savedIds,
 }: {
   smeId: string
   packages: Pkg[]
   appliedIds: string[]
+  savedIds: string[]
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState('')
   const [applied, setApplied] = useState<string[]>(appliedIds)
+  const [saved, setSaved] = useState<string[]>(savedIds)
+  const [bookmarkBusy, setBookmarkBusy] = useState<string | null>(null)
   const [detail, setDetail] = useState<Pkg | null>(null)
 
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('all')
   const [sortBy, setSortBy] = useState('newest')
+
+  // deep-link: ถ้า URL มี ?package=xxx ให้เปิด modal ของแพ็กเกจนั้นอัตโนมัติ (ใช้ตอนคลิกลิงก์แชร์)
+  useEffect(() => {
+    const pkgId = searchParams.get('package')
+    if (pkgId) {
+      const found = packages.find(p => p.id === pkgId)
+      if (found) setDetail(found)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const availableCats = useMemo(() => {
     const set = new Set(packages.map(p => p.category))
@@ -123,6 +138,14 @@ export default function SmePackages({
     setApplied(prev => [...prev, pkgId])
     setDetail(null)
     router.refresh()
+  }
+
+  async function toggleSave(pkgId: string) {
+    setBookmarkBusy(pkgId)
+    const { data, error } = await supabase.rpc('toggle_save_package', { p_package_id: pkgId })
+    setBookmarkBusy(null)
+    if (error) { setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
+    setSaved(prev => data ? [...prev, pkgId] : prev.filter(id => id !== pkgId))
   }
 
   if (packages.length === 0) {
@@ -179,12 +202,35 @@ export default function SmePackages({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {shown.map(p => {
             const isApplied = applied.includes(p.id)
+            const isSaved = saved.includes(p.id)
             const svc = SERVICE_INFO[p.service_status ?? 'open'] ?? SERVICE_INFO.open
             const coverUrl = p.cover_square?.url || p.cover_banner?.url || p.image_url
             const agencyName = p.profiles?.agencies?.name || p.profiles?.agency_name || '—'
             return (
               <div key={p.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden',
-                background: '#fff', display: 'flex', flexDirection: 'column' }}>
+                background: '#fff', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+                {p.is_featured && (
+                  <span style={{
+                    position: 'absolute', top: 8, left: 8, zIndex: 1,
+                    background: '#16a34a', color: '#fff', fontSize: 11, fontWeight: 600,
+                    padding: '3px 10px', borderRadius: 6,
+                  }}>
+                    แนะนำ
+                  </span>
+                )}
+                <button
+                  onClick={() => toggleSave(p.id)}
+                  disabled={bookmarkBusy === p.id}
+                  title={isSaved ? 'เลิกบันทึก' : 'บันทึกแพ็กเกจนี้'}
+                  style={{
+                    position: 'absolute', top: 8, right: 8, zIndex: 1,
+                    width: 30, height: 30, borderRadius: '50%', border: 'none',
+                    background: 'rgba(255,255,255,0.9)', cursor: 'pointer', fontSize: 15,
+                    color: isSaved ? '#1e3a8a' : '#94a3b8',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                  {isSaved ? '★' : '☆'}
+                </button>
                 <div style={{ height: 140, background: '#f1f5f9', flexShrink: 0 }}>
                   {coverUrl ? (
                     <img src={coverUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -262,6 +308,9 @@ export default function SmePackages({
           closedLabel={(SERVICE_INFO[detail.service_status ?? 'open'] ?? SERVICE_INFO.open).closedLabel}
           applying={busy === detail.id}
           onApply={() => apply(detail.id)}
+          isSaved={saved.includes(detail.id)}
+          onToggleSave={() => toggleSave(detail.id)}
+          savingBookmark={bookmarkBusy === detail.id}
         />
       )}
     </div>
