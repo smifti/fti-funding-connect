@@ -49,6 +49,17 @@ export default function UserManager({
   const [msg, setMsg] = useState('')
   const [saving, setSaving] = useState(false)
   const [detail, setDetail] = useState<User | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState<string | null>(null)
+
+  async function deleteUser(userId: string) {
+    setDeleteBusy(userId); setMsg('')
+    const { error } = await supabase.rpc('admin_delete_user', { p_user_id: userId })
+    setDeleteBusy(null)
+    if (error) { setMsg('ลบไม่สำเร็จ: ' + error.message); return }
+    setConfirmDeleteId(null)
+    router.refresh()
+  }
   function startEdit(u: User) {
     setEditing(u.id)
     setRole(u.role)
@@ -167,13 +178,34 @@ export default function UserManager({
                           <button className="btn btn-ghost btn-sm" onClick={() => setEditing(null)}>ยกเลิก</button>
                         </div>
                       </div>
+) : confirmDeleteId === u.id ? (
+                      <div style={{ minWidth: 220 }}>
+                        <div style={{ background: '#fee2e2', color: '#991b1b', fontSize: 12,
+                          padding: '8px 10px', borderRadius: 8, marginBottom: 8, lineHeight: 1.5 }}>
+                          ⚠️ ลบบัญชีนี้ถาวร ข้อมูลทั้งหมด (โปรไฟล์, ใบสมัคร, บริการที่เกี่ยวข้อง ฯลฯ) จะหายไปและกู้คืนไม่ได้ ยืนยันหรือไม่?
+                        </div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn btn-sm" disabled={deleteBusy === u.id}
+                            onClick={() => deleteUser(u.id)}
+                            style={{ background: '#dc2626' }}>
+                            {deleteBusy === u.id ? 'กำลังลบ…' : 'ยืนยันลบถาวร'}
+                          </button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDeleteId(null)}>ยกเลิก</button>
+                        </div>
+                      </div>
                     ) : (
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         <button className="btn btn-ghost btn-sm" onClick={() => setDetail(u)}>ดูรายละเอียด</button>
                         {u.id === myId ? (
                           <span style={{ fontSize: 13, color: 'var(--muted)', alignSelf: 'center' }}>บัญชีของคุณ</span>
                         ) : (
-                          <button className="btn btn-ghost btn-sm" onClick={() => startEdit(u)}>เปลี่ยนสิทธิ์</button>
+                          <>
+                            <button className="btn btn-ghost btn-sm" onClick={() => startEdit(u)}>เปลี่ยนสิทธิ์</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDeleteId(u.id)}
+                              style={{ color: '#dc2626' }}>
+                              ลบ
+                            </button>
+                          </>
                         )}
                       </div>
                     )}
