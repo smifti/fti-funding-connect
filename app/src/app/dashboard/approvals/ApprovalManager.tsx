@@ -139,18 +139,14 @@ export default function ApprovalManager({ initialUsers }: { initialUsers: User[]
         </td>
         <td>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => setDetailUser(u)}>
+              ดูข้อมูล
+            </button>
             {isPending && (
-              <button className="btn btn-ghost btn-sm" onClick={() => setDetailUser(u)}>
-                ดูข้อมูล
-              </button>
-            )}
-            {isPending ? (
               <button className="btn btn-sm" disabled={working === u.id}
                 onClick={() => approve(u)}>
                 {working === u.id ? 'กำลังอนุมัติ…' : '✓ อนุมัติ'}
               </button>
-            ) : (
-              !isPending && <span style={{ fontSize: 13, color: 'var(--muted)' }}>—</span>
             )}
           </div>
         </td>
