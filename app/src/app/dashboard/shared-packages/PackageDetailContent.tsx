@@ -55,6 +55,7 @@ export type Pkg = {
   category: string
   title: string
   description: string | null
+  overview?: string | null
   price_amount: number | null
   price_note: string | null
   funding_type: string | null
@@ -566,29 +567,41 @@ export default function PackageDetailContent({
         <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
           {tab === 'main' && (
             <>
-              {highlightList.length > 0 && (
-                <div>
-                  <h3 style={{ fontSize: 15, margin: '0 0 10px' }}>จุดเด่น</h3>
-                  <Checklist items={highlightList} />
-                </div>
-              )}
+              {(pkg.overview || highlightList.length > 0 || suitableForList.length > 0) && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+                  {pkg.overview && (
+                    <div>
+                      <h3 style={{ fontSize: 15, margin: '0 0 10px' }}>ภาพรวมบริการ</h3>
+                      <p style={{ fontSize: 14, color: '#334155', lineHeight: 1.7, margin: 0 }}>{pkg.overview}</p>
+                    </div>
+                  )}
 
-              {suitableForList.length > 0 && (
-                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: 14 }}>
-                  <h3 style={{ fontSize: 14, margin: '0 0 10px', color: '#1e3a8a' }}>เหมาะสำหรับ</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {suitableForList.map((item, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: '#1e40af' }}>
-                        <span style={{ flexShrink: 0 }}>🎯</span>
-                        <span>{item}</span>
+                  {highlightList.length > 0 && (
+                    <div>
+                      <h3 style={{ fontSize: 15, margin: '0 0 10px' }}>จุดเด่น</h3>
+                      <Checklist items={highlightList} />
+                    </div>
+                  )}
+
+                  {suitableForList.length > 0 && (
+                    <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: 14 }}>
+                      <h3 style={{ fontSize: 14, margin: '0 0 10px', color: '#1e3a8a' }}>เหมาะสำหรับ</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {suitableForList.map((item, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: '#1e40af' }}>
+                            <span style={{ flexShrink: 0 }}>🎯</span>
+                            <span>{item}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
 
               {sliderImages.length > 0 && (
                 <div>
+                  <h3 style={{ fontSize: 15, margin: '0 0 10px' }}>เอกสารและสื่อประชาสัมพันธ์</h3>
                   <ImageSlider images={sliderImages} />
                 </div>
               )}
