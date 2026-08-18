@@ -100,6 +100,15 @@ type Pkg = {
   detail_images: ImageMeta[] | null
   // ข้อมูลจากตาราง package_rate_structures (join แบบ nested เดี่ยว หรือ null ถ้ายังไม่เคยตั้งค่า)
   package_rate_structures?: any | null
+  required_documents: string | null
+}
+
+type FaqRow = {
+  id: string
+  question: string
+  answer: string
+  sort_order: number
+  created_at: string
 }
 
 type LogRow = {
@@ -130,6 +139,7 @@ const EMPTY_FORM = {
   loan_term: '',
   collateral_required: '',
   collateral_detail: '',
+  required_documents: '',
 }
 
 export default function AgencyPackages({
@@ -169,15 +179,15 @@ export default function AgencyPackages({
   // modal ดูรายละเอียดข้อเสนอ/บริการ (read-only)
   const [detailPkg, setDetailPkg] = useState<Pkg | null>(null)
 
-  // ประวัติการแก้ไข — expand/collapse ต่อแถว
   const [showLog, setShowLog] = useState<string | null>(null)
-  const [logsCache, setLogsCache] = useState<Record<string, LogRow[]>>({})
 
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
 
   function resetForm() {
     setForm({ ...EMPTY_FORM })
     setEditId(null)
+    setFaqs([])
+    resetFaqForm()
     setSectorTags([])
     setSectorPick('')
     setCoverBannerFile(null)
@@ -225,6 +235,7 @@ export default function AgencyPackages({
       loan_term: p.loan_term ?? '',
       collateral_required: p.collateral_required ?? '',
       collateral_detail: p.collateral_detail ?? '',
+      required_documents: p.required_documents ?? '',
     })
     setCoverBannerFile(null)
     setCoverBannerExisting(p.cover_banner ?? null)
@@ -239,6 +250,53 @@ export default function AgencyPackages({
     setEditId(p.id)
     setShowForm(true)
     setMsg('')
+    loadFaqs(p.id)
+  }
+
+  async function loadFaqs(pkgId: string) {
+    setFaqLoading(true)
+    const { data, error } = await supabase.rpc('list_package_faqs', { p_package_id: pkgId })
+    setFaqLoading(false)
+    if (!error) setFaqs(data ?? [])
+  }
+
+  function resetFaqForm() {
+    setFaqQuestion('')
+    setFaqAnswer('')
+    setFaqEditingId(null)
+  }
+
+  async function saveFaq() {
+    if (!editId) return
+    if (!faqQuestion.trim() || !faqAnswer.trim()) { setMsg('กรุณากรอกทั้งคำถามและคำตอบ'); return }
+    setFaqBusy(true)
+    const { error } = await supabase.rpc('agency_upsert_package_faq', {
+      p_package_id: editId,
+      p_question: faqQuestion.trim(),
+      p_answer: faqAnswer.trim(),
+      p_faq_id: faqEditingId,
+    })
+    setFaqBusy(false)
+    if (error) { setMsg('บันทึกคำถามไม่สำเร็จ: ' + error.message); return }
+    resetFaqForm()
+    loadFaqs(editId)
+  }
+
+  function editFaq(f: FaqRow) {
+    setFaqEditingId(f.id)
+    setFaqQuestion(f.question)
+    setFaqAnswer(f.answer)
+  }
+
+  async function deleteFaq(id: string) {
+    if (!editId) return
+    if (!confirm('ต้องการลบคำถามนี้ใช่หรือไม่?')) return
+    setFaqBusy(true)
+    const { error } = await supabase.rpc('agency_delete_package_faq', { p_faq_id: id })
+    setFaqBusy(false)
+    if (error) { setMsg('ลบไม่สำเร็จ: ' + error.message); return }
+    if (faqEditingId === id) resetFaqForm()
+    loadFaqs(editId)
   }
 
   function addSectorTag() {
@@ -376,6 +434,7 @@ export default function AgencyPackages({
       collateral_required: isLoan ? (form.collateral_required || null) : null,
       collateral_detail: isLoan ? (form.collateral_detail.trim() || null) : null,
       detail_images: finalDetailImages.length > 0 ? finalDetailImages : null,
+      required_documents: form.required_documents.trim() || null,
     }
     if (coverBannerMeta !== undefined) payload.cover_banner = coverBannerMeta
     if (coverSquareMeta !== undefined) payload.cover_square = coverSquareMeta
@@ -751,6 +810,57 @@ export default function AgencyPackages({
             <input style={fieldStyle} value={form.support_items}
               onChange={e => set('support_items', e.target.value)} placeholder="เช่น ค่าที่ปรึกษา, ค่าเครื่องจักร, ค่า Training" />
           </div>
+
+          <div>
+            <label style={labelStyle}>เอกสารที่ต้องใช้ (พิมพ์ทีละบรรทัด)</label>
+            <textarea style={{ ...fieldStyle, minHeight: 100, resize: 'vertical' }}
+              value={form.required_documents} onChange={e => set('required_documents', e.target.value)}
+              placeholder={'เช่น\nสำเนาบัตรประชาชนผู้กู้\nหนังสือรับรองบริษัท (ไม่เกิน 3 เดือน)\nงบการเงินย้อนหลัง 2 ปี'} />
+          </div>
+
+          {editId && (
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>❓ คำถามที่พบบ่อย (FAQ)</div>
+              {faqLoading ? (
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>กำลังโหลด…</span>
+              ) : faqs.length === 0 ? (
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>ยังไม่มีคำถามที่พบบ่อย</span>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {faqs.map(f => (
+                    <div key={f.id} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', fontSize: 13 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                        <strong>{f.question}</strong>
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => editFaq(f)}>แก้ไข</button>
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => deleteFaq(f.id)} style={{ color: '#dc2626' }}>ลบ</button>
+                        </div>
+                      </div>
+                      <div style={{ color: '#64748b', marginTop: 4 }}>{f.answer}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <input style={fieldStyle} placeholder="คำถาม" value={faqQuestion} onChange={e => setFaqQuestion(e.target.value)} />
+                <textarea style={{ ...fieldStyle, minHeight: 60, resize: 'vertical' }} placeholder="คำตอบ"
+                  value={faqAnswer} onChange={e => setFaqAnswer(e.target.value)} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" className="btn btn-sm" disabled={faqBusy} onClick={saveFaq}>
+                    {faqBusy ? 'กำลังบันทึก…' : (faqEditingId ? 'บันทึกการแก้ไข' : '+ เพิ่มคำถาม')}
+                  </button>
+                  {faqEditingId && (
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={resetFaqForm}>ยกเลิก</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          {!editId && (
+            <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>
+              💡 บันทึกข้อเสนอ/บริการนี้ก่อน แล้วกด "แก้ไข" อีกครั้ง จึงจะเพิ่มคำถามที่พบบ่อยได้
+            </p>
+          )}
           </>
           )}
 
