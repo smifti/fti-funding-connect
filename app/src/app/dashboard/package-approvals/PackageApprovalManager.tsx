@@ -41,7 +41,7 @@ type Pkg = {
   cover_square: ImageMeta | null
   detail_images: ImageMeta[] | null
   package_rate_structures?: any | null
-  profiles: { agency_name: string | null; full_name: string | null } | null
+  profiles: { agency_name: string | null; full_name: string | null; agency_logo: string | null } | null
 }
 
 type TabKey = 'pending' | 'approved' | 'rejected'
@@ -50,6 +50,7 @@ type TabKey = 'pending' | 'approved' | 'rejected'
 type AgencyGroup = {
   ownerId: string
   agencyName: string
+  agencyLogo: string | null
   packages: Pkg[]
 }
 
@@ -65,6 +66,7 @@ function groupByAgency(pkgs: Pkg[]): AgencyGroup[] {
       groups.push({
         ownerId: key,
         agencyName: p.profiles?.agency_name || p.profiles?.full_name || '—',
+        agencyLogo: p.profiles?.agency_logo ?? null,
         packages: [],
       })
     }
@@ -131,7 +133,7 @@ export default function PackageApprovalManager({
     )
   }
 
-  // การ์ดกลุ่มของหน่วยงาน 1 แห่ง — หัวการ์ดโชว์ชื่อ agency + จำนวนบริการ ข้างในลิสต์บริการทั้งหมดของ agency นั้น
+  // การ์ดกลุ่มของหน่วยงาน 1 แห่ง — หัวการ์ดโชว์โลโก้ + ชื่อ agency + จำนวนบริการ ข้างในลิสต์บริการทั้งหมดของ agency นั้น
   function agencyGroupCard(group: AgencyGroup, renderRow: (p: Pkg) => React.ReactNode) {
     return (
       <div key={group.ownerId} className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -139,7 +141,21 @@ export default function PackageApprovalManager({
           padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8,
         }}>
-          <span style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{group.agencyName}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: 10, flexShrink: 0, overflow: 'hidden',
+              border: '1px solid #e2e8f0', background: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {group.agencyLogo ? (
+                <img src={group.agencyLogo} alt={group.agencyName}
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              ) : (
+                <span style={{ fontSize: 22, color: '#cbd5e1' }}>🏢</span>
+              )}
+            </div>
+            <span style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{group.agencyName}</span>
+          </div>
           <span style={{ fontSize: 12, color: '#64748b' }}>{group.packages.length} บริการ</span>
         </div>
         <div>
