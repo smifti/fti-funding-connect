@@ -1,5 +1,6 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase-browser'
 import { rateStructureFromRow } from './RateStructureTab'
 
 const APPROVAL_LABELS: Record<string, { text: string; bg: string; color: string }> = {
@@ -42,6 +43,12 @@ type ImageMeta = {
   uploaded_at: string | null
 }
 
+type FaqRow = {
+  id: string
+  question: string
+  answer: string
+}
+
 type Pkg = {
   id: string
   template_type: string
@@ -70,9 +77,23 @@ type Pkg = {
   cover_banner: ImageMeta | null
   cover_square: ImageMeta | null
   detail_images: ImageMeta[] | null
+  required_documents?: string | null
   package_rate_structures?: any | null
-  // เฉพาะฝั่ง admin: ชื่อหน่วยงานเจ้าของบริการนี้ (agency ไม่ต้องส่งมา เพราะเป็นของตัวเองอยู่แล้ว)
-  profiles?: { agency_name: string | null; full_name: string | null } | null
+  profiles?: {
+    agency_name: string | null
+    full_name: string | null
+    agency_email?: string | null
+    phone?: string | null
+    agencies?: {
+      name: string | null
+      logo: string | null
+      description: string | null
+      website: string | null
+      email: string | null
+      contact_name: string | null
+      contact_phone: string | null
+    } | null
+  } | null
 }
 
 const labelStyle = { fontSize: 12, color: '#94a3b8', fontWeight: 500 } as const
@@ -88,7 +109,6 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-// Lightbox — แสดงรูปขนาดจริง ซ้อนทับเต็มจอ พื้นหลังมืด เลื่อนดูรูปอื่นในชุดได้
 function Lightbox({
   images, startIndex, onClose,
 }: {
@@ -146,8 +166,6 @@ function Lightbox({
   )
 }
 
-// Slider รูปภาพ — ใช้ทั้ง thumbnail และรูปรายละเอียดรวมกันเป็นชุดเดียว
-// คลิกที่รูปหลักเพื่อเปิดดูขนาดจริงใน Lightbox
 function ImageSlider({ images }: { images: string[] }) {
   const [idx, setIdx] = useState(0)
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -212,7 +230,6 @@ function ImageSlider({ images }: { images: string[] }) {
   )
 }
 
-// รูปหน้าปกเล็ก ๆ (แบนเนอร์/จตุรัส) พร้อม label กำกับ — คลิกเปิดดูขนาดจริงได้เหมือนกัน
 function CoverThumbnail({ url, label }: { url: string; label: string }) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   return (
@@ -237,23 +254,38 @@ function CoverThumbnail({ url, label }: { url: string; label: string }) {
 
 export default function PackageDetailModal({
   pkg, applicantCount, onClose,
+  mode = 'agency',
+  canApply = false, isApplied = false, applying = false, onApply, closedLabel,
 }: {
   pkg: Pkg
   applicantCount: number
   onClose: () => void
+  mode?: 'sme' | 'agency' | 'admin'
+  canApply?: boolean
+  isApplied?: boolean
+  applying?: boolean
+  onApply?: () => void
+  closedLabel?: string
 }) {
+  const supabase = createClient()
   const isLoan = pkg.package_type === 'สินเชื่อ'
-  const [tab, setTab] = useState<'main' | 'rate'>('main')
+  const [tab, setTab] = useState<'main' | 'rate' | 'documents' | 'faq'>('main')
   const ap = APPROVAL_LABELS[pkg.approval_status] ?? APPROVAL_LABELS.pending
 
-  // slider หลัก: แสดงเฉพาะภาพรายละเอียดบริการเท่านั้น (ไม่รวมภาพหน้าปก)
+  const [faqs, setFaqs] = useState<FaqRow[] | null>(null)
+  useEffect(() => {
+    if (tab === 'faq' && faqs === null) {
+      supabase.rpc('list_package_faqs', { p_package_id: pkg.id }).then(({ data, error }) => {
+        if (!error) setFaqs(data ?? [])
+      })
+    }
+  }, [tab])
+
   const detailImageUrls = (pkg.detail_images ?? []).map(img => img.url)
-  // fallback: ถ้าไม่มี detail_images เลยแต่มี image_url เดิม (ข้อมูลเก่าก่อน migrate) ให้ใช้แทนไปก่อน
   const sliderImages = detailImageUrls.length > 0
     ? detailImageUrls
     : (!pkg.cover_banner && !pkg.cover_square && pkg.image_url ? [pkg.image_url] : [])
 
-  // ภาพหน้าปก 2 แบบ แสดงแยกเป็น thumbnail เล็กเหนือ slider หลัก
   const coverImages: { url: string; label: string }[] = [
     ...(pkg.cover_banner ? [{ url: pkg.cover_banner.url, label: 'ภาพหน้าปกแบนเนอร์ (2:1)' }] : []),
     ...(pkg.cover_square ? [{ url: pkg.cover_square.url, label: 'ภาพหน้าปกจตุรัส (1:1)' }] : []),
@@ -261,9 +293,19 @@ export default function PackageDetailModal({
 
   const rate = isLoan ? rateStructureFromRow(pkg.package_rate_structures) : null
 
+  const agency = pkg.profiles?.agencies
+  const agencyDisplayName = agency?.name || pkg.profiles?.agency_name || pkg.profiles?.full_name || '—'
+  const agencyContact = [agency?.contact_phone || pkg.profiles?.phone, agency?.email || pkg.profiles?.agency_email]
+    .filter(Boolean).join(' · ')
+
+  const documentList = (pkg.required_documents ?? '')
+    .split('\n')
+    .map(s => s.trim())
+    .filter(Boolean)
+
   const tabBtnStyle = (active: boolean) => ({
     padding: '8px 16px', border: 'none', background: 'none', cursor: 'pointer',
-    fontSize: 14, fontWeight: 600,
+    fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap' as const,
     color: active ? '#2563eb' : '#94a3b8',
     borderBottom: active ? '2px solid #2563eb' : '2px solid transparent',
     marginBottom: -2,
@@ -280,34 +322,36 @@ export default function PackageDetailModal({
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          background: '#fff', borderRadius: 14, width: '100%', maxWidth: 720,
-          maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          background: '#fff', borderRadius: 14, width: '100%', maxWidth: 880,
+          maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}>
-        {/* Header */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
           padding: '18px 20px 0 20px',
         }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 18 }}>{pkg.title}</h2>
-            {pkg.profiles && (
-              <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
-                โดย: {pkg.profiles.agency_name || pkg.profiles.full_name || '—'}
-              </div>
-            )}
+            <h2 style={{ margin: 0, fontSize: 19 }}>{pkg.title}</h2>
+            <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
+              โดย: {agencyDisplayName}
+              {mode === 'sme' && agencyContact && <> · {agencyContact}</>}
+            </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
-              <span style={{
-                background: ap.bg, color: ap.color, fontSize: 12,
-                padding: '3px 10px', borderRadius: 12,
-              }}>
-                {ap.text}
-              </span>
+              {mode !== 'sme' && (
+                <span style={{
+                  background: ap.bg, color: ap.color, fontSize: 12,
+                  padding: '3px 10px', borderRadius: 12,
+                }}>
+                  {ap.text}
+                </span>
+              )}
               {pkg.approval_status === 'approved' && (
                 <span style={{ fontSize: 12, color: '#64748b' }}>
                   {SERVICE_LABELS[pkg.service_status] ?? pkg.service_status}
                 </span>
               )}
-              <span style={{ fontSize: 12, color: '#64748b' }}>· ผู้สมัคร {applicantCount} ราย</span>
+              {mode !== 'sme' && (
+                <span style={{ fontSize: 12, color: '#64748b' }}>· ผู้สมัคร {applicantCount} ราย</span>
+              )}
             </div>
           </div>
           <button onClick={onClose} aria-label="ปิด" style={{
@@ -316,19 +360,23 @@ export default function PackageDetailModal({
           }}>×</button>
         </div>
 
-        {/* Tabs */}
-        {isLoan && (
-          <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #e2e8f0', padding: '10px 20px 0 20px' }}>
-            <button onClick={() => setTab('main')} style={tabBtnStyle(tab === 'main')}>ข้อมูลทั่วไป</button>
+        <div style={{ display: 'flex', gap: 4, borderBottom: '2px solid #e2e8f0', padding: '10px 20px 0 20px', overflowX: 'auto' }}>
+          <button onClick={() => setTab('main')} style={tabBtnStyle(tab === 'main')}>ข้อมูลทั่วไป</button>
+          {isLoan && (
             <button onClick={() => setTab('rate')} style={tabBtnStyle(tab === 'rate')}>
-              📊 อัตราดอกเบี้ย / ค่าบริการทางการเงิน
+              📊 อัตราดอกเบี้ย / ค่าธรรมเนียม
             </button>
-          </div>
-        )}
+          )}
+          <button onClick={() => setTab('documents')} style={tabBtnStyle(tab === 'documents')}>
+            📄 เอกสารที่ใช้
+          </button>
+          <button onClick={() => setTab('faq')} style={tabBtnStyle(tab === 'faq')}>
+            ❓ คำถามที่พบบ่อย
+          </button>
+        </div>
 
-        {/* Body (scrollable) */}
         <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
-          {tab === 'main' ? (
+          {tab === 'main' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               {coverImages.length > 0 && (
                 <div>
@@ -402,77 +450,135 @@ export default function PackageDetailModal({
                 <Field label="สิ่งที่สนับสนุน" value={pkg.support_items} />
               </div>
             </div>
-          ) : (
-            rate && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                  <Field label="ประเภทการกำหนดอัตราดอกเบี้ย" value={RATE_TYPE_LABELS[rate.rate_type] ?? rate.rate_type} />
-                  <Field label="วิธีคิดดอกเบี้ย" value={rate.calculation_method} />
-                  <Field label="หน่วยอัตรา" value={RATE_UNIT_LABELS[rate.rate_unit] ?? rate.rate_unit} />
-                  <Field label="ข้อมูลอัตรา ณ วันที่" value={rate.rate_as_of_date} />
-                </div>
+          )}
 
-                <div>
-                  <div style={{ ...labelStyle, marginBottom: 8 }}>รายละเอียดอัตราดอกเบี้ย</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {rate.rate_tiers.map((t, i) => (
-                      <div key={t.id} style={{
-                        border: '1px solid #e2e8f0', borderRadius: 8, padding: 10, fontSize: 13,
-                      }}>
-                        <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                          ช่วงที่ {i + 1}: {t.period_from} – {t.period_to}
-                        </div>
-                        {t.rate_kind === 'fixed' && <div>อัตราคงที่ {t.fixed_rate}{RATE_UNIT_LABELS[rate.rate_unit]}</div>}
-                        {t.rate_kind === 'range' && <div>ช่วงอัตรา {t.range_min} – {t.range_max}{RATE_UNIT_LABELS[rate.rate_unit]}</div>}
-                        {t.rate_kind === 'reference' && (
-                          <div>{t.reference_index} {t.reference_sign} {t.reference_spread}{RATE_UNIT_LABELS[rate.rate_unit]}</div>
-                        )}
-                        {t.rate_kind === 'step' && <div>อัตราขั้นบันได {t.fixed_rate}{RATE_UNIT_LABELS[rate.rate_unit]}</div>}
-                        {t.rate_kind === 'case_by_case' && <div>ตามการพิจารณา</div>}
-                        {t.note && <div style={{ color: '#64748b', marginTop: 2 }}>{t.note}</div>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <Field label="เงื่อนไข / หมายเหตุอัตราดอกเบี้ย" value={rate.rate_conditions} />
-
-                {rate.fee_items.length > 0 && (
-                  <div>
-                    <div style={{ ...labelStyle, marginBottom: 8 }}>ค่าธรรมเนียมและค่าใช้จ่ายที่เกี่ยวข้อง</div>
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                        <thead>
-                          <tr>
-                            <th style={{ textAlign: 'left', padding: '6px 8px' }}>ประเภทค่าธรรมเนียม</th>
-                            <th style={{ textAlign: 'left', padding: '6px 8px' }}>อัตรา/จำนวน</th>
-                            <th style={{ textAlign: 'left', padding: '6px 8px' }}>หน่วย</th>
-                            <th style={{ textAlign: 'left', padding: '6px 8px' }}>เก็บเมื่อไหร่</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {rate.fee_items.map(f => (
-                            <tr key={f.id}>
-                              <td style={{ padding: '6px 8px' }}>{f.fee_name}</td>
-                              <td style={{ padding: '6px 8px' }}>{f.amount}</td>
-                              <td style={{ padding: '6px 8px' }}>{FEE_UNIT_LABELS[f.unit] ?? f.unit}</td>
-                              <td style={{ padding: '6px 8px' }}>{FEE_CHARGED_WHEN_LABELS[f.charged_when] ?? f.charged_when}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                <Field label="หมายเหตุค่าธรรมเนียม" value={rate.fee_notes} />
+          {tab === 'rate' && rate && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                <Field label="ประเภทการกำหนดอัตราดอกเบี้ย" value={RATE_TYPE_LABELS[rate.rate_type] ?? rate.rate_type} />
+                <Field label="วิธีคิดดอกเบี้ย" value={rate.calculation_method} />
+                <Field label="หน่วยอัตรา" value={RATE_UNIT_LABELS[rate.rate_unit] ?? rate.rate_unit} />
+                <Field label="ข้อมูลอัตรา ณ วันที่" value={rate.rate_as_of_date} />
               </div>
-            )
+
+              <div>
+                <div style={{ ...labelStyle, marginBottom: 8 }}>รายละเอียดอัตราดอกเบี้ย</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {rate.rate_tiers.map((t, i) => (
+                    <div key={t.id} style={{
+                      border: '1px solid #e2e8f0', borderRadius: 8, padding: 10, fontSize: 13,
+                    }}>
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                        ช่วงที่ {i + 1}: {t.period_from} – {t.period_to}
+                      </div>
+                      {t.rate_kind === 'fixed' && <div>อัตราคงที่ {t.fixed_rate}{RATE_UNIT_LABELS[rate.rate_unit]}</div>}
+                      {t.rate_kind === 'range' && <div>ช่วงอัตรา {t.range_min} – {t.range_max}{RATE_UNIT_LABELS[rate.rate_unit]}</div>}
+                      {t.rate_kind === 'reference' && (
+                        <div>{t.reference_index} {t.reference_sign} {t.reference_spread}{RATE_UNIT_LABELS[rate.rate_unit]}</div>
+                      )}
+                      {t.rate_kind === 'step' && <div>อัตราขั้นบันได {t.fixed_rate}{RATE_UNIT_LABELS[rate.rate_unit]}</div>}
+                      {t.rate_kind === 'case_by_case' && <div>ตามการพิจารณา</div>}
+                      {t.note && <div style={{ color: '#64748b', marginTop: 2 }}>{t.note}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Field label="เงื่อนไข / หมายเหตุอัตราดอกเบี้ย" value={rate.rate_conditions} />
+
+              {rate.fee_items.length > 0 && (
+                <div>
+                  <div style={{ ...labelStyle, marginBottom: 8 }}>ค่าธรรมเนียมและค่าใช้จ่ายที่เกี่ยวข้อง</div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: 'left', padding: '6px 8px' }}>ประเภทค่าธรรมเนียม</th>
+                          <th style={{ textAlign: 'left', padding: '6px 8px' }}>อัตรา/จำนวน</th>
+                          <th style={{ textAlign: 'left', padding: '6px 8px' }}>หน่วย</th>
+                          <th style={{ textAlign: 'left', padding: '6px 8px' }}>เก็บเมื่อไหร่</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rate.fee_items.map(f => (
+                          <tr key={f.id}>
+                            <td style={{ padding: '6px 8px' }}>{f.fee_name}</td>
+                            <td style={{ padding: '6px 8px' }}>{f.amount}</td>
+                            <td style={{ padding: '6px 8px' }}>{FEE_UNIT_LABELS[f.unit] ?? f.unit}</td>
+                            <td style={{ padding: '6px 8px' }}>{FEE_CHARGED_WHEN_LABELS[f.charged_when] ?? f.charged_when}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <Field label="หมายเหตุค่าธรรมเนียม" value={rate.fee_notes} />
+            </div>
+          )}
+
+          {tab === 'documents' && (
+            <div>
+              <h3 style={{ fontSize: 15, margin: '0 0 12px' }}>เอกสารที่ต้องใช้</h3>
+              {documentList.length === 0 ? (
+                <p style={{ fontSize: 13, color: '#94a3b8' }}>ยังไม่มีข้อมูลเอกสารที่ต้องใช้ — กรุณาติดต่อหน่วยงานผู้ให้บริการ</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {documentList.map((doc, i) => (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 10,
+                      background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px',
+                      fontSize: 14, color: '#334155',
+                    }}>
+                      <span style={{ color: '#16a34a', flexShrink: 0 }}>✓</span>
+                      <span>{doc}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === 'faq' && (
+            <div>
+              <h3 style={{ fontSize: 15, margin: '0 0 12px' }}>คำถามที่พบบ่อย</h3>
+              {faqs === null ? (
+                <p style={{ fontSize: 13, color: '#94a3b8' }}>กำลังโหลด…</p>
+              ) : faqs.length === 0 ? (
+                <p style={{ fontSize: 13, color: '#94a3b8' }}>ยังไม่มีคำถามที่พบบ่อยสำหรับบริการนี้</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {faqs.map(f => (
+                    <div key={f.id} style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: '#1e293b', marginBottom: 4 }}>
+                        {f.question}
+                      </div>
+                      <div style={{ fontSize: 13, color: '#64748b' }}>{f.answer}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', textAlign: 'right' }}>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          {mode === 'sme' && (
+            isApplied ? (
+              <button className="btn" disabled style={{ background: '#dcfce7', color: '#166534', border: 'none' }}>
+                ✓ สมัครแล้ว
+              </button>
+            ) : canApply ? (
+              <button className="btn btn-sm" disabled={applying} onClick={onApply}>
+                {applying ? 'กำลังสมัคร…' : 'สนใจ / สมัคร'}
+              </button>
+            ) : (
+              <button className="btn btn-sm" disabled style={{ background: '#f1f5f9', color: '#94a3b8', border: 'none' }}>
+                {closedLabel ?? 'ปิดรับสมัคร'}
+              </button>
+            )
+          )}
           <button className="btn btn-ghost btn-sm" onClick={onClose}>ปิด</button>
         </div>
       </div>
