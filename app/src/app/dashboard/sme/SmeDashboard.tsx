@@ -73,6 +73,11 @@ export default async function SmeDashboard({ userId }: { userId: string }) {
     .eq('sme_id', sme.id)
     .order('created_at', { ascending: false })
   const appliedIds = (apps ?? []).map((a: any) => a.package_id).filter(Boolean)
+
+  // package_id ที่ SME คนนี้บันทึกไว้ (บุ๊กมาร์ก)
+  const { data: savedIdsData } = await supabase.rpc('list_my_saved_package_ids')
+  const savedIds: string[] = savedIdsData ?? []
+
   return (
     <SmeTabs
       sme={sme}
@@ -80,7 +85,9 @@ export default async function SmeDashboard({ userId }: { userId: string }) {
       health={health}
       packages={packages ?? []}
       appliedIds={appliedIds}
+      savedIds={savedIds}
       myApplications={apps ?? []}
     />
   )
+}
 }
