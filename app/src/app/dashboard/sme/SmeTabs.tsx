@@ -144,7 +144,7 @@ export default function SmeTabs({
           ภาพรวม
         </button>
         <button onClick={() => setTab('packages')} style={tabStyle(tab === 'packages')}>
-          แพ็กเกจสนับสนุน ({packages.length})
+          บริการที่สนับสนุน ({packages.length})
         </button>
         <button onClick={() => setTab('profile')}
           style={{ ...tabStyle(tab === 'profile'), display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -175,9 +175,9 @@ export default function SmeTabs({
           </div>
 
           <div className="card">
-            <h2>แพ็กเกจที่ฉันสมัคร ({myApplications.length})</h2>
+            <h2>บริการที่ฉันสมัคร ({myApplications.length})</h2>
             {myApplications.length === 0 ? (
-              <p className="empty">ยังไม่ได้สมัครแพ็กเกจ — ไปที่แท็บ "แพ็กเกจสนับสนุน" เพื่อเลือกสมัคร</p>
+              <p className="empty">ยังไม่ได้สมัครบริการ — ไปที่แท็บ "บริการที่สนับสนุน" เพื่อเลือกสมัคร</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {myApplications.map(app => {
