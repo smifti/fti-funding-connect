@@ -2,18 +2,27 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
+import PackageDetailModal from '../shared-packages/PackageDetailModal'
 
 const CATEGORY_LABELS: Record<string, string> = {
   credit: 'สินเชื่อ', innovation: 'นวัตกรรม', management: 'บริหารจัดการ',
   marketing: 'การตลาด', production: 'การผลิต', upskill: 'Upskill / Reskill',
   other: 'อื่น ๆ (ESG)',
 }
-const SERVICE_INFO: Record<string, { label: string; bg: string; color: string; canApply: boolean }> = {
+const SERVICE_INFO: Record<string, { label: string; bg: string; color: string; canApply: boolean; closedLabel?: string }> = {
   open: { label: '🟢 เปิดให้บริการ', bg: '#dcfce7', color: '#166534', canApply: true },
-  paused: { label: '⚪ ปิดรับชั่วคราว', bg: '#f1f5f9', color: '#64748b', canApply: false },
-  ended: { label: '⚫ สิ้นสุดโครงการ', bg: '#e2e8f0', color: '#475569', canApply: false },
+  paused: { label: '⚪ ปิดรับชั่วคราว', bg: '#f1f5f9', color: '#64748b', canApply: false, closedLabel: 'ปิดรับชั่วคราว' },
+  ended: { label: '⚫ สิ้นสุดโครงการ', bg: '#e2e8f0', color: '#475569', canApply: false, closedLabel: 'สิ้นสุดโครงการ' },
 }
 
+type ImageMeta = {
+  url: string
+  filename: string
+  size: number | null
+  uploaded_at: string | null
+}
+
+// ต้อง match กับ type Pkg ใน PackageDetailModal.tsx เพื่อส่งผ่าน props ได้ตรง
 type Pkg = {
   id: string
   template_type: string
@@ -28,9 +37,37 @@ type Pkg = {
   target_industry: string | null
   open_period: string | null
   image_url: string | null
-  service_status?: string
-  created_at?: string
-  profiles: { agency_name: string | null; agency_email: string | null; phone: string | null } | null
+  approval_status: string
+  is_active: boolean
+  service_status: string
+  package_type: string | null
+  related_sectors: string[] | null
+  min_amount: number | null
+  max_amount: number | null
+  eligibility_criteria: string | null
+  loan_term: string | null
+  collateral_required: string | null
+  collateral_detail: string | null
+  cover_banner: ImageMeta | null
+  cover_square: ImageMeta | null
+  detail_images: ImageMeta[] | null
+  required_documents: string | null
+  package_rate_structures?: any | null
+  profiles: {
+    full_name: string | null
+    agency_name: string | null
+    agency_email: string | null
+    phone: string | null
+    agencies: {
+      name: string | null
+      logo: string | null
+      description: string | null
+      website: string | null
+      email: string | null
+      contact_name: string | null
+      contact_phone: string | null
+    } | null
+  } | null
 }
 
 export default function SmePackages({
@@ -64,12 +101,12 @@ export default function SmePackages({
       list = list.filter(p =>
         (p.title ?? '').toLowerCase().includes(q) ||
         (p.description ?? '').toLowerCase().includes(q) ||
-        (p.profiles?.agency_name ?? '').toLowerCase().includes(q) ||
+        (p.profiles?.agencies?.name ?? p.profiles?.agency_name ?? '').toLowerCase().includes(q) ||
         (p.support_items ?? '').toLowerCase().includes(q) ||
         (p.target_industry ?? '').toLowerCase().includes(q)
       )
     }
-    if (sortBy === 'newest') list.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
+    if (sortBy === 'newest') list.sort((a: any, b: any) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
     else if (sortBy === 'price_high') list.sort((a, b) => (b.price_amount ?? 0) - (a.price_amount ?? 0))
     else if (sortBy === 'price_low') list.sort((a, b) => (a.price_amount ?? 0) - (b.price_amount ?? 0))
     else if (sortBy === 'title') list.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? '', 'th'))
@@ -143,12 +180,14 @@ export default function SmePackages({
           {shown.map(p => {
             const isApplied = applied.includes(p.id)
             const svc = SERVICE_INFO[p.service_status ?? 'open'] ?? SERVICE_INFO.open
+            const coverUrl = p.cover_square?.url || p.cover_banner?.url || p.image_url
+            const agencyName = p.profiles?.agencies?.name || p.profiles?.agency_name || '—'
             return (
               <div key={p.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden',
                 background: '#fff', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ height: 140, background: '#f1f5f9', flexShrink: 0 }}>
-                  {p.image_url ? (
-                    <img src={p.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {coverUrl ? (
+                    <img src={coverUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center',
                       justifyContent: 'center', color: '#cbd5e1', fontSize: 13 }}>ไม่มีรูปภาพ</div>
@@ -161,7 +200,7 @@ export default function SmePackages({
                   </span>
                   <h3 style={{ margin: '0 0 4px', fontSize: 16 }}>{p.title}</h3>
                   <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
-                    {p.profiles?.agency_name || '—'}
+                    {agencyName}
                   </div>
                   {p.description && (
                     <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px',
@@ -169,9 +208,17 @@ export default function SmePackages({
                       {p.description}
                     </p>
                   )}
-                  {p.price_amount != null && (
+                  {(p.min_amount != null || p.max_amount != null || p.price_amount != null) && (
                     <div style={{ fontSize: 14, fontWeight: 600, color: '#1e3a8a', marginBottom: 10 }}>
-                      {p.price_amount.toLocaleString('th-TH')} บาท
+                      {p.min_amount != null || p.max_amount != null ? (
+                        <>
+                          {p.min_amount != null ? p.min_amount.toLocaleString('th-TH') : '—'}
+                          {' - '}
+                          {p.max_amount != null ? p.max_amount.toLocaleString('th-TH') : '—'} บาท
+                        </>
+                      ) : (
+                        <>{p.price_amount!.toLocaleString('th-TH')} บาท</>
+                      )}
                       {p.price_note && <span style={{ fontSize: 12, fontWeight: 400, color: '#64748b' }}> · {p.price_note}</span>}
                     </div>
                   )}
@@ -193,7 +240,7 @@ export default function SmePackages({
                       </button>
                     ) : (
                       <button className="btn btn-sm" disabled style={{ background: '#f1f5f9', color: '#94a3b8', border: 'none' }}>
-                        {p.service_status === 'ended' ? 'สิ้นสุดโครงการ' : 'ปิดรับชั่วคราว'}
+                        {svc.closedLabel}
                       </button>
                     )}
                   </div>
@@ -205,60 +252,17 @@ export default function SmePackages({
       )}
 
       {detail && (
-        <div onClick={() => setDetail(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 100 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12,
-            maxWidth: 560, width: '100%', maxHeight: '85vh', overflow: 'auto' }}>
-            {detail.image_url && (
-              <img src={detail.image_url} alt="" style={{ width: '100%', maxHeight: 240, objectFit: 'cover' }} />
-            )}
-            <div style={{ padding: 20 }}>
-              <span style={{ background: '#f1f5f9', color: '#475569', fontSize: 12,
-                padding: '2px 10px', borderRadius: 8 }}>{CATEGORY_LABELS[detail.category] ?? detail.category}</span>
-              <h2 style={{ margin: '10px 0 4px' }}>{detail.title}</h2>
-              <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>
-                โดย: {detail.profiles?.agency_name || '—'}
-              </div>
-              {detail.service_status && detail.service_status !== 'open' && (
-                <div style={{ background: (SERVICE_INFO[detail.service_status] ?? SERVICE_INFO.open).bg,
-                  color: (SERVICE_INFO[detail.service_status] ?? SERVICE_INFO.open).color, fontSize: 13,
-                  padding: '4px 12px', borderRadius: 8, display: 'inline-block', marginBottom: 12 }}>
-                  {(SERVICE_INFO[detail.service_status] ?? SERVICE_INFO.open).label}
-                </div>
-              )}
-              {detail.description && <p style={{ fontSize: 14, marginBottom: 14 }}>{detail.description}</p>}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14, color: '#334155' }}>
-                {detail.price_amount != null && <div><strong>วงเงิน:</strong> {detail.price_amount.toLocaleString('th-TH')} บาท {detail.price_note}</div>}
-                {detail.funding_type && <div><strong>รูปแบบทุน:</strong> {detail.funding_type}</div>}
-                {detail.support_items && <div><strong>สิ่งที่สนับสนุน:</strong> {detail.support_items}</div>}
-                {detail.target_sme && <div><strong>SME ที่เหมาะสม:</strong> {detail.target_sme}</div>}
-                {detail.target_industry && <div><strong>อุตสาหกรรมเป้าหมาย:</strong> {detail.target_industry}</div>}
-                {detail.open_period && <div><strong>ระยะเวลาเปิดรับ:</strong> {detail.open_period}</div>}
-                {(detail.profiles?.agency_email || detail.profiles?.phone) && (
-                  <div><strong>ติดต่อ:</strong> {detail.profiles?.agency_email} {detail.profiles?.phone}</div>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-                {applied.includes(detail.id) ? (
-                  <button className="btn" disabled style={{ background: '#dcfce7', color: '#166534', border: 'none' }}>
-                    ✓ สมัครแล้ว
-                  </button>
-                ) : (SERVICE_INFO[detail.service_status ?? 'open'] ?? SERVICE_INFO.open).canApply ? (
-                  <button className="btn" disabled={busy === detail.id} onClick={() => apply(detail.id)}>
-                    {busy === detail.id ? 'กำลังสมัคร…' : 'สนใจ / สมัคร'}
-                  </button>
-                ) : (
-                  <button className="btn" disabled style={{ background: '#f1f5f9', color: '#94a3b8', border: 'none' }}>
-                    {detail.service_status === 'ended' ? 'สิ้นสุดโครงการ' : 'ปิดรับชั่วคราว'}
-                  </button>
-                )}
-                <button className="btn btn-ghost" onClick={() => setDetail(null)}>ปิด</button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PackageDetailModal
+          pkg={detail}
+          applicantCount={0}
+          onClose={() => setDetail(null)}
+          mode="sme"
+          isApplied={applied.includes(detail.id)}
+          canApply={(SERVICE_INFO[detail.service_status ?? 'open'] ?? SERVICE_INFO.open).canApply}
+          closedLabel={(SERVICE_INFO[detail.service_status ?? 'open'] ?? SERVICE_INFO.open).closedLabel}
+          applying={busy === detail.id}
+          onApply={() => apply(detail.id)}
+        />
       )}
     </div>
   )
