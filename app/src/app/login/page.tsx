@@ -32,7 +32,7 @@ function LoginForm() {
       .eq('id', data.user.id)
       .single()
 
-    if (profile && (profile.role === 'agency' || profile.role === 'expert') && !profile.approval_confirmed_at) {
+    if (profile && (profile.role === 'agency' || profile.role === 'expert' || profile.role === 'sme') && !profile.approval_confirmed_at) {
       await supabase.auth.signOut()
       setLoading(false)
       setErr('บัญชีของท่านได้รับการอนุมัติแล้ว แต่ยังไม่ได้ยืนยันตัวตน กรุณาตรวจสอบอีเมลที่ระบบส่งให้และกดยืนยันก่อนเข้าสู่ระบบ')
