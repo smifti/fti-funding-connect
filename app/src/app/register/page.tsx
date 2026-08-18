@@ -102,7 +102,7 @@ export default function RegisterPage() {
       } else if (msg.includes('already registered') || msg.includes('User already')) {
         setErr('อีเมลนี้เคยลงทะเบียนแล้ว กรุณาเข้าสู่ระบบ')
       } else {
-        setErr('DEBUG: ' + msg)
+        setErr('เกิดข้อผิดพลาดในการลงทะเบียน กรุณาตรวจสอบข้อมูลแล้วลองใหม่')
       }
       return
     }
