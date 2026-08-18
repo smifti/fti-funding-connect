@@ -200,63 +200,69 @@ function Lightbox({
 
 function ImageSlider({ images }: { images: string[] }) {
   const [idx, setIdx] = useState(0)
-  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
   if (images.length === 0) return null
 
-  function prev() { setIdx(i => (i === 0 ? images.length - 1 : i - 1)) }
-  function next() { setIdx(i => (i === images.length - 1 ? 0 : i + 1)) }
+  const CARD_W = 190
+  const GAP = 12
+
+  function prev() { setIdx(i => Math.max(0, i - 1)) }
+  function next() { setIdx(i => Math.min(images.length - 1, i + 1)) }
 
   return (
-    <div>
-      <div style={{
-        position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 10,
-        overflow: 'hidden', background: '#f1f5f9', border: '1px solid #e2e8f0',
-      }}>
-        <img
-          src={images[idx]}
-          alt=""
-          onClick={() => setLightboxOpen(true)}
-          title="คลิกเพื่อดูขนาดจริง"
-          style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'zoom-in' }}
-        />
-        {images.length > 1 && (
-          <>
-            <button type="button" onClick={prev} aria-label="ก่อนหน้า" style={{
-              position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
-              width: 32, height: 32, borderRadius: '50%', border: 'none',
-              background: 'rgba(15,23,42,0.55)', color: '#fff', cursor: 'pointer', fontSize: 16,
-            }}>‹</button>
-            <button type="button" onClick={next} aria-label="ถัดไป" style={{
-              position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-              width: 32, height: 32, borderRadius: '50%', border: 'none',
-              background: 'rgba(15,23,42,0.55)', color: '#fff', cursor: 'pointer', fontSize: 16,
-            }}>›</button>
-            <div style={{
-              position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
-              background: 'rgba(15,23,42,0.55)', color: '#fff', fontSize: 11,
-              padding: '2px 8px', borderRadius: 10,
-            }}>
-              {idx + 1} / {images.length}
-            </div>
-          </>
-        )}
-      </div>
-      {images.length > 1 && (
-        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+    <div style={{ position: 'relative', padding: '0 4px' }}>
+      <div style={{ overflow: 'hidden' }}>
+        <div style={{
+          display: 'flex', gap: GAP,
+          transform: `translateX(-${idx * (CARD_W + GAP)}px)`,
+          transition: 'transform .3s ease',
+        }}>
           {images.map((url, i) => (
-            <button key={url + i} type="button" onClick={() => setIdx(i)}
+            <button key={url + i} type="button" onClick={() => setLightboxIdx(i)}
+              title="คลิกเพื่อดูขนาดจริง"
               style={{
-                width: 48, height: 48, borderRadius: 6, overflow: 'hidden', padding: 0, cursor: 'pointer',
-                border: i === idx ? '2px solid #2563eb' : '1px solid #e2e8f0', background: 'none',
+                flex: `0 0 ${CARD_W}px`, width: CARD_W, height: CARD_W * 1.35,
+                borderRadius: 12, overflow: 'hidden', border: '1px solid #e2e8f0',
+                padding: 0, cursor: 'zoom-in', background: '#f1f5f9',
               }}>
-              <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
             </button>
+          ))}
+        </div>
+      </div>
+
+      {images.length > 1 && idx > 0 && (
+        <button type="button" onClick={prev} aria-label="ก่อนหน้า" style={{
+          position: 'absolute', left: -16, top: 'calc(50% - 10px)', transform: 'translateY(-50%)',
+          width: 36, height: 36, borderRadius: '50%', border: '1px solid #e2e8f0',
+          background: '#fff', color: '#334155', cursor: 'pointer', fontSize: 18,
+          boxShadow: '0 2px 6px rgba(0,0,0,0.15)', zIndex: 2,
+        }}>‹</button>
+      )}
+      {images.length > 1 && idx < images.length - 1 && (
+        <button type="button" onClick={next} aria-label="ถัดไป" style={{
+          position: 'absolute', right: -16, top: 'calc(50% - 10px)', transform: 'translateY(-50%)',
+          width: 36, height: 36, borderRadius: '50%', border: '1px solid #e2e8f0',
+          background: '#fff', color: '#334155', cursor: 'pointer', fontSize: 18,
+          boxShadow: '0 2px 6px rgba(0,0,0,0.15)', zIndex: 2,
+        }}>›</button>
+      )}
+
+      {images.length > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 12 }}>
+          {images.map((_, i) => (
+            <button key={i} type="button" onClick={() => setIdx(i)}
+              aria-label={`ไปที่ภาพที่ ${i + 1}`}
+              style={{
+                width: i === idx ? 18 : 7, height: 7, borderRadius: 4, border: 'none', padding: 0,
+                background: i === idx ? '#1e3a8a' : '#cbd5e1', cursor: 'pointer', transition: 'all .2s',
+              }} />
           ))}
         </div>
       )}
 
-      {lightboxOpen && (
-        <Lightbox images={images} startIndex={idx} onClose={() => setLightboxOpen(false)} />
+      {lightboxIdx !== null && (
+        <Lightbox images={images} startIndex={lightboxIdx} onClose={() => setLightboxIdx(null)} />
       )}
     </div>
   )
@@ -341,7 +347,7 @@ export default function PackageDetailModal({
         onClick={e => e.stopPropagation()}
         style={{
           position: 'relative',
-          background: '#fff', borderRadius: 16, width: '100%', maxWidth: 980,
+          background: '#fff', borderRadius: 16, width: '100%', maxWidth: 1120,
           maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
           boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
         }}>
@@ -359,7 +365,7 @@ export default function PackageDetailModal({
 
             {/* ===== Sidebar ซ้าย ===== */}
             <div style={{
-              flex: '0 0 260px', minWidth: 240,
+              flex: '0 0 300px', minWidth: 260,
               borderRight: '1px solid #e2e8f0', padding: '24px 20px',
               display: 'flex', flexDirection: 'column', gap: 16,
             }}>
@@ -430,7 +436,7 @@ export default function PackageDetailModal({
 
               {/* Hero banner */}
               {pkg.cover_banner ? (
-                <div style={{ position: 'relative', width: '100%', aspectRatio: '2 / 1', background: '#0f172a' }}>
+                <div style={{ position: 'relative', width: '100%', aspectRatio: '3.2 / 1', maxHeight: 280, background: '#0f172a' }}>
                   <img src={pkg.cover_banner.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <div style={{
                     position: 'absolute', inset: 0,
