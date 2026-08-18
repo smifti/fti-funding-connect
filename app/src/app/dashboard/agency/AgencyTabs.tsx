@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import AgencyAction from './AgencyAction'
@@ -35,6 +35,18 @@ type Profile = {
   agency_logo: string | null
 }
 
+// ข้อมูลหน่วยงานที่ใช้ร่วมกันทุก user ในหน่วยงานเดียวกัน (ตาราง agencies)
+type Agency = {
+  id: string
+  name: string
+  logo: string | null
+  description: string | null
+  website: string | null
+  email: string | null
+  contact_name: string | null
+  contact_phone: string | null
+}
+
 export default function AgencyTabs({
   profile, requests, smeList, packages, applicants, currentUser, applicantCounts,
   slaConfig, holidays,
@@ -49,10 +61,26 @@ export default function AgencyTabs({
   slaConfig: SlaConfig
   holidays: string[]
 }) {
+  const supabase = createClient()
   const [tab, setTab] = useState<'overview' | 'packages' | 'profile' | 'sme' | 'settings'>('overview')
   const [filterPkg, setFilterPkg] = useState<string | null>(null)
   const [filterPkgTitle, setFilterPkgTitle] = useState<string | null>(null)
   const cats = (profile.agency_categories ?? []) as string[]
+
+  // ข้อมูลหน่วยงาน (ชุดเดียวกันทุก user ในหน่วยงาน) — undefined = กำลังโหลด, null = ยังไม่ได้จัดกลุ่ม
+  const [agency, setAgency] = useState<Agency | null | undefined>(undefined)
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadAgency() {
+      const { data, error } = await supabase.rpc('get_my_agency')
+      if (cancelled) return
+      if (error || !data || data.length === 0) { setAgency(null); return }
+      setAgency(data[0])
+    }
+    loadAgency()
+    return () => { cancelled = true }
+  }, [])
 
   const tabStyle = (active: boolean) => ({
     border: 'none', background: 'none', cursor: 'pointer',
@@ -62,9 +90,11 @@ export default function AgencyTabs({
     borderBottom: active ? '2px solid #1e3a8a' : '2px solid transparent',
   })
 
+  const displayName = agency?.name || profile.agency_name || 'หน่วยงานสนับสนุน'
+
   return (
     <>
-      <h1 className="page-title">{profile.agency_name ?? 'หน่วยงานสนับสนุน'}</h1>
+      <h1 className="page-title">{displayName}</h1>
       <p className="page-sub">
         รับผิดชอบด้าน: {cats.map(c => CATEGORY_LABELS[c]).join(' · ') || '—'}
       </p>
@@ -115,25 +145,66 @@ export default function AgencyTabs({
         />
       )}
 
-      {tab === 'profile' && <AgencyProfileForm profile={profile} />}
+      {tab === 'profile' && (
+        <AgencyProfileForm agency={agency} onSaved={updated => setAgency(updated)} />
+      )}
       {tab === 'settings' && <ChangePassword />}
     </>
   )
 }
 
-function AgencyProfileForm({ profile }: { profile: Profile }) {
-  const router = useRouter()
+function AgencyProfileForm({
+  agency, onSaved,
+}: {
+  agency: Agency | null | undefined
+  onSaved: (updated: Agency) => void
+}) {
   const supabase = createClient()
+
+  // ยังโหลดอยู่
+  if (agency === undefined) {
+    return (
+      <div className="card" style={{ maxWidth: 640 }}>
+        <p className="empty">กำลังโหลดข้อมูลหน่วยงาน…</p>
+      </div>
+    )
+  }
+
+  // ยังไม่ได้จัดกลุ่มเข้าหน่วยงาน
+  if (agency === null) {
+    return (
+      <div className="card" style={{ maxWidth: 640 }}>
+        <h2>ข้อมูลหน่วยงาน</h2>
+        <div style={{
+          background: '#fef9c3', color: '#a16207', padding: '12px 16px',
+          borderRadius: 10, fontSize: 14, lineHeight: 1.6,
+        }}>
+          บัญชีของท่านยังไม่ได้จัดกลุ่มเข้าหน่วยงาน กรุณาติดต่อผู้ดูแลระบบ
+        </div>
+      </div>
+    )
+  }
+
+  return <AgencyProfileFormReady agency={agency} onSaved={onSaved} supabase={supabase} />
+}
+
+function AgencyProfileFormReady({
+  agency, onSaved, supabase,
+}: {
+  agency: Agency
+  onSaved: (updated: Agency) => void
+  supabase: ReturnType<typeof createClient>
+}) {
   const [form, setForm] = useState({
-    agency_name: profile.agency_name ?? '',
-    full_name: profile.full_name ?? '',
-    phone: profile.phone ?? '',
-    agency_email: profile.agency_email ?? '',
-    agency_website: profile.agency_website ?? '',
-    agency_description: profile.agency_description ?? '',
+    name: agency.name ?? '',
+    contact_name: agency.contact_name ?? '',
+    contact_phone: agency.contact_phone ?? '',
+    email: agency.email ?? '',
+    website: agency.website ?? '',
+    description: agency.description ?? '',
   })
   const [logoFile, setLogoFile] = useState<File | null>(null)
-  const [logoPreview, setLogoPreview] = useState<string | null>(profile.agency_logo ?? null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(agency.logo ?? null)
   const [dragOver, setDragOver] = useState(false)
   const [uploadPct, setUploadPct] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
@@ -150,14 +221,14 @@ function AgencyProfileForm({ profile }: { profile: Profile }) {
 
   async function save() {
     setBusy(true); setMsg('')
-    let logoUrl: string | undefined = undefined
+    let logoUrl: string = agency.logo ?? ''
     if (logoFile) {
       setUploadPct(0)
       const timer = setInterval(() => {
         setUploadPct(p => (p === null ? 10 : Math.min(p + 15, 90)))
       }, 150)
       const ext = logoFile.name.split('.').pop()
-      const path = `logos/${profile.id}-${Date.now()}.${ext}`
+      const path = `logos/${agency.id}-${Date.now()}.${ext}`
       const { error: upErr } = await supabase.storage
         .from('package-images')
         .upload(path, logoFile)
@@ -168,20 +239,29 @@ function AgencyProfileForm({ profile }: { profile: Profile }) {
       logoUrl = pub.publicUrl
       setTimeout(() => setUploadPct(null), 600)
     }
-    const payload: any = {
-      agency_name: form.agency_name || null,
-      full_name: form.full_name || null,
-      phone: form.phone || null,
-      agency_email: form.agency_email || null,
-      agency_website: form.agency_website || null,
-      agency_description: form.agency_description || null,
-    }
-    if (logoUrl !== undefined) payload.agency_logo = logoUrl
-    const { error } = await supabase.from('profiles').update(payload).eq('id', profile.id)
+
+    const { error } = await supabase.rpc('agency_update_own_agency', {
+      p_name: form.name || agency.name,
+      p_logo: logoUrl || null,
+      p_description: form.description || null,
+      p_website: form.website || null,
+      p_email: form.email || null,
+      p_contact_name: form.contact_name || null,
+      p_contact_phone: form.contact_phone || null,
+    })
     setBusy(false)
     if (error) { setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
     setMsg('บันทึกเรียบร้อยแล้ว')
-    router.refresh()
+    onSaved({
+      ...agency,
+      name: form.name || agency.name,
+      logo: logoUrl || null,
+      description: form.description || null,
+      website: form.website || null,
+      email: form.email || null,
+      contact_name: form.contact_name || null,
+      contact_phone: form.contact_phone || null,
+    })
   }
 
   const fieldStyle = {
@@ -193,6 +273,9 @@ function AgencyProfileForm({ profile }: { profile: Profile }) {
   return (
     <div className="card" style={{ maxWidth: 640 }}>
       <h2>ข้อมูลหน่วยงาน</h2>
+      <p style={{ fontSize: 13, color: '#64748b', marginTop: -8, marginBottom: 12 }}>
+        ข้อมูลชุดนี้ใช้ร่วมกันทุกบัญชีในหน่วยงานเดียวกัน แก้ไขที่นี่แล้วทุกคนจะเห็นการเปลี่ยนแปลงทันที
+      </p>
       {msg && (
         <div style={{ background: msg.startsWith('บันทึก') ? '#dcfce7' : '#fee2e2',
                    color: msg.startsWith('บันทึก') ? '#166534' : '#991b1b',
@@ -252,32 +335,32 @@ function AgencyProfileForm({ profile }: { profile: Profile }) {
         </div>
         <div>
           <label style={labelStyle}>ชื่อหน่วยงาน / บริษัท</label>
-          <input style={fieldStyle} value={form.agency_name} onChange={e => set('agency_name', e.target.value)} />
+          <input style={fieldStyle} value={form.name} onChange={e => set('name', e.target.value)} />
         </div>
         <div>
           <label style={labelStyle}>รายละเอียดบริการ</label>
           <textarea style={{ ...fieldStyle, minHeight: 90, resize: 'vertical' }}
             placeholder="อธิบายบริการที่หน่วยงานของท่านให้แก่ SME"
-            value={form.agency_description} onChange={e => set('agency_description', e.target.value)} />
+            value={form.description} onChange={e => set('description', e.target.value)} />
         </div>
         <div style={{ display: 'flex', gap: 14 }}>
           <div style={{ flex: 1 }}>
             <label style={labelStyle}>ชื่อผู้ติดต่อ</label>
-            <input style={fieldStyle} value={form.full_name} onChange={e => set('full_name', e.target.value)} />
+            <input style={fieldStyle} value={form.contact_name} onChange={e => set('contact_name', e.target.value)} />
           </div>
           <div style={{ flex: 1 }}>
             <label style={labelStyle}>เบอร์โทร</label>
-            <input style={fieldStyle} value={form.phone} onChange={e => set('phone', e.target.value)} />
+            <input style={fieldStyle} value={form.contact_phone} onChange={e => set('contact_phone', e.target.value)} />
           </div>
         </div>
         <div style={{ display: 'flex', gap: 14 }}>
           <div style={{ flex: 1 }}>
             <label style={labelStyle}>อีเมลติดต่อ</label>
-            <input style={fieldStyle} value={form.agency_email} onChange={e => set('agency_email', e.target.value)} />
+            <input style={fieldStyle} value={form.email} onChange={e => set('email', e.target.value)} />
           </div>
           <div style={{ flex: 1 }}>
             <label style={labelStyle}>เว็บไซต์</label>
-            <input style={fieldStyle} value={form.agency_website} onChange={e => set('agency_website', e.target.value)} />
+            <input style={fieldStyle} value={form.website} onChange={e => set('website', e.target.value)} />
           </div>
         </div>
         <div>
