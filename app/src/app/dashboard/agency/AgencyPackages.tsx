@@ -173,7 +173,13 @@ export default function AgencyPackages({
   const [form, setForm] = useState({ ...EMPTY_FORM })
 
   // ด้านที่เกี่ยวข้อง / ประเภทสินเชื่อ (tag สะสม)
-  st [sectorTags, setSectorTags] = useState<string[]>
+  const [sectorTags, setSectorTags] = useState<string[]>([])
+  const [sectorPick, setSectorPick] = useState('') // ค่าที่เลือกจาก dropdown หรือพิมพ์เอง (กรณีไม่ใช่สินเชื่อ)
+
+  // เอกสารที่ต้องใช้ (tag สะสม) — เลือกจาก dropdown แล้วเพิ่มไปเรื่อยๆ หรือพิมพ์เองผ่าน "อื่นๆ"
+  const [docTags, setDocTags] = useState<string[]>([])
+  const [docPick, setDocPick] = useState('')
+
   // ภาพหน้าปก 2 แบบ: ไฟล์ใหม่ที่เลือก (ยังไม่ upload) + metadata เดิมจาก DB (ถ้ามี, ตอนแก้ไข)
   const [coverBannerFile, setCoverBannerFile] = useState<File | null>(null)
   const [coverBannerExisting, setCoverBannerExisting] = useState<ImageMeta | null>(null)
