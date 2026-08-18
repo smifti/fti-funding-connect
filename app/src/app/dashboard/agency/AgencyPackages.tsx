@@ -36,6 +36,13 @@ const SERVICE_LABELS: Record<string, string> = {
   paused: '⚪ ปิดรับชั่วคราว',
   ended: '⚫ สิ้นสุดโครงการ',
 }
+const ACTION_LABEL: Record<string, string> = {
+  created: 'สร้างข้อเสนอ/บริการใหม่',
+  updated: 'แก้ไขข้อมูล',
+}
+const ROLE_LABEL: Record<string, string> = {
+  agency: 'หน่วยงาน', expert: 'ที่ปรึกษา', admin: 'ผู้ดูแลระบบ',
+}
 
 // ประเภทข้อเสนอ/บริการ (แยกจาก template_type เดิม — template_type จะถูก auto-set ตามนี้เบื้องหลัง ไม่แสดงใน UI แล้ว)
 const PACKAGE_TYPE_OPTIONS = ['สินเชื่อ', 'ทุนเต็มจำนวน', 'ทุนบางส่วน', 'อื่นๆ']
@@ -93,6 +100,14 @@ type Pkg = {
   detail_images: ImageMeta[] | null
   // ข้อมูลจากตาราง package_rate_structures (join แบบ nested เดี่ยว หรือ null ถ้ายังไม่เคยตั้งค่า)
   package_rate_structures?: any | null
+}
+
+type LogRow = {
+  id: string
+  action: string
+  changed_by_name: string | null
+  changed_by_role: string | null
+  created_at: string
 }
 
 const EMPTY_FORM = {
@@ -153,6 +168,10 @@ export default function AgencyPackages({
 
   // modal ดูรายละเอียดข้อเสนอ/บริการ (read-only)
   const [detailPkg, setDetailPkg] = useState<Pkg | null>(null)
+
+  // ประวัติการแก้ไข — expand/collapse ต่อแถว
+  const [showLog, setShowLog] = useState<string | null>(null)
+  const [logsCache, setLogsCache] = useState<Record<string, LogRow[]>>({})
 
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -270,6 +289,15 @@ export default function AgencyPackages({
     setNewDetailFiles([])
   }
 
+  async function toggleLog(pkgId: string) {
+    if (showLog === pkgId) { setShowLog(null); return }
+    setShowLog(pkgId)
+    if (!logsCache[pkgId]) {
+      const { data, error } = await supabase.rpc('get_package_edit_logs', { p_package_id: pkgId })
+      if (!error) setLogsCache(prev => ({ ...prev, [pkgId]: data ?? [] }))
+    }
+  }
+
   async function save() {
     if (!form.title.trim()) { setMsg('กรุณาระบุชื่อข้อเสนอ/บริการ'); return }
     const isLoanCheck = form.package_type === 'สินเชื่อ'
@@ -354,6 +382,7 @@ export default function AgencyPackages({
 
     let error
     let savedPackageId: string | null = editId
+    const isNew = !editId
     if (editId) {
       payload.approval_status = 'pending'
       const res = await supabase.from('packages').update(payload).eq('id', editId)
@@ -385,6 +414,16 @@ export default function AgencyPackages({
         // ไม่ใช่สินเชื่ออีกต่อไป (เปลี่ยนประเภทตอนแก้ไข) → ล้างข้อมูลอัตราดอกเบี้ยเดิมทิ้ง ไม่ให้ค้างเป็นข้อมูลกำพร้า
         await supabase.from('package_rate_structures').delete().eq('package_id', savedPackageId)
       }
+      // บันทึกประวัติการแก้ไข
+      await supabase.rpc('log_package_edit', {
+        p_package_id: savedPackageId,
+        p_action: isNew ? 'created' : 'updated',
+      })
+      setLogsCache(prev => {
+        const rest = { ...prev }
+        delete rest[savedPackageId!]
+        return rest
+      })
     }
 
     setBusy(false)
@@ -738,7 +777,9 @@ export default function AgencyPackages({
             {initial.map(p => {
               const ap = APPROVAL_LABELS[p.approval_status] ?? APPROVAL_LABELS.pending
               const count = applicantCounts[p.id] ?? 0
+              const logs = logsCache[p.id]
               return (
+                <>
                 <tr key={p.id}>
                   <td>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
@@ -811,8 +852,37 @@ export default function AgencyPackages({
                         ลบ
                       </button>
                     </div>
+                    <button
+                      onClick={() => toggleLog(p.id)}
+                      style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#1e3a8a',
+                        fontSize: 12, padding: 0, marginTop: 6 }}>
+                      {showLog === p.id ? '▼' : '▶'} ประวัติการแก้ไข
+                    </button>
                   </td>
                 </tr>
+                {showLog === p.id && (
+                  <tr key={p.id + '-log'}>
+                    <td colSpan={6} style={{ background: '#f8fafc', padding: '10px 16px' }}>
+                      {!logs ? (
+                        <span style={{ fontSize: 12, color: '#94a3b8' }}>กำลังโหลด…</span>
+                      ) : logs.length === 0 ? (
+                        <span style={{ fontSize: 12, color: '#94a3b8' }}>ยังไม่มีประวัติ</span>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {logs.map(log => (
+                            <div key={log.id} style={{ fontSize: 12, color: '#475569' }}>
+                              <strong>{log.changed_by_name ?? '—'}</strong>
+                              <span style={{ color: '#94a3b8' }}> ({ROLE_LABEL[log.changed_by_role ?? ''] ?? log.changed_by_role})</span>
+                              {' '}{ACTION_LABEL[log.action] ?? log.action}
+                              <span style={{ color: '#94a3b8' }}> — {new Date(log.created_at).toLocaleString('th-TH')}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+                </>
               )
             })}
           </tbody>
