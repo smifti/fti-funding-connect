@@ -92,6 +92,7 @@ export default function SmePackages({
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('all')
   const [sortBy, setSortBy] = useState('newest')
+  const [savedOnly, setSavedOnly] = useState(false)
 
   // deep-link: ถ้า URL มี ?package=xxx ให้เปิด modal ของแพ็กเกจนั้นอัตโนมัติ (ใช้ตอนคลิกลิงก์แชร์)
   useEffect(() => {
@@ -111,6 +112,7 @@ export default function SmePackages({
   const shown = useMemo(() => {
     let list = [...packages]
     if (catFilter !== 'all') list = list.filter(p => p.category === catFilter)
+    if (savedOnly) list = list.filter(p => saved.includes(p.id))
     const q = search.trim().toLowerCase()
     if (q) {
       list = list.filter(p =>
@@ -126,7 +128,7 @@ export default function SmePackages({
     else if (sortBy === 'price_low') list.sort((a, b) => (a.price_amount ?? 0) - (b.price_amount ?? 0))
     else if (sortBy === 'title') list.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? '', 'th'))
     return list
-  }, [packages, catFilter, search, sortBy])
+  }, [packages, catFilter, search, sortBy, savedOnly, saved])
 
   async function apply(pkgId: string) {
     setBusy(pkgId); setMsg('')
@@ -194,6 +196,12 @@ export default function SmePackages({
             </button>
           )
         })}
+        {saved.length > 0 && (
+          <button onClick={() => setSavedOnly(prev => !prev)}
+            style={chipStyle(savedOnly)}>
+            ★ บันทึกไว้ ({saved.length})
+          </button>
+        )}
       </div>
 
       {shown.length === 0 ? (
