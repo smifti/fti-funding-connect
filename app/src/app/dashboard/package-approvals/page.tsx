@@ -10,7 +10,7 @@ export default async function PackageApprovalsPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, full_name, agency_name')
     .eq('id', user.id)
     .single()
   const role = profile?.role ?? 'sme'
@@ -28,7 +28,8 @@ export default async function PackageApprovalsPage() {
       loan_term, collateral_required, collateral_detail,
       cover_banner, cover_square, detail_images,
       package_rate_structures(*),
-      profiles(agency_name, full_name, agency_logo)
+      profiles(agency_name, full_name, agency_logo),
+      package_approval_logs(id, new_status, note, changed_by_name, changed_by_role, created_at)
     `)
     .order('created_at', { ascending: false })
 
@@ -42,6 +43,13 @@ export default async function PackageApprovalsPage() {
     if (app.package_id) applicantCounts[app.package_id] = (applicantCounts[app.package_id] ?? 0) + 1
   }
 
+  // ข้อมูลผู้ใช้ปัจจุบัน (ไว้บันทึก log การอนุมัติ)
+  const currentUser = {
+    id: user.id,
+    name: profile?.full_name || profile?.agency_name || '—',
+    role,
+  }
+
   return (
     <>
       <TopBar role={role} />
@@ -51,7 +59,7 @@ export default async function PackageApprovalsPage() {
           <p className="page-sub">
             ตรวจสอบและอนุมัติบริการที่ผู้ให้บริการสร้างขึ้น ก่อนแสดงให้ SME เห็น
           </p>
-          <PackageApprovalManager initial={packages ?? []} applicantCounts={applicantCounts} />
+          <PackageApprovalManager initial={packages ?? []} applicantCounts={applicantCounts} currentUser={currentUser} />
         </div>
       </main>
     </>
