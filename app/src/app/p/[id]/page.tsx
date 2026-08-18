@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import PackageDetailContent from '../../dashboard/shared-packages/PackageDetailContent'
 
+export const dynamic = 'force-dynamic'
+
 export default async function PublicPackagePage({ params }: { params: { id: string } }) {
   const supabase = await createClient()
   const { data, error } = await supabase.rpc('get_public_package_detail', { p_package_id: params.id })
