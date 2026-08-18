@@ -28,7 +28,7 @@ export default async function PackageApprovalsPage() {
       loan_term, collateral_required, collateral_detail,
       cover_banner, cover_square, detail_images,
       package_rate_structures(*),
-      profiles(agency_name, full_name)
+      profiles(agency_name, full_name, agency_logo)
     `)
     .order('created_at', { ascending: false })
 
