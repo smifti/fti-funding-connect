@@ -68,6 +68,10 @@ export async function TopBar({ role }: { role: string }) {
                 style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
                 🏦 ผู้ให้บริการ/ที่ปรึกษา
               </a>
+              <a href="/dashboard/manage-agencies" className="btn btn-ghost btn-sm"
+                style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
+                🏢 จัดการหน่วยงาน
+              </a>
             </>
           )}
           {isReviewer && (
