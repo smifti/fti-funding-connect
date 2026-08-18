@@ -78,6 +78,7 @@ type Pkg = {
   cover_square: ImageMeta | null
   detail_images: ImageMeta[] | null
   required_documents?: string | null
+  is_featured?: boolean
   package_rate_structures?: any | null
   profiles?: {
     agency_name: string | null
@@ -272,6 +273,7 @@ export default function PackageDetailModal({
   pkg, applicantCount, onClose,
   mode = 'agency',
   canApply = false, isApplied = false, applying = false, onApply, closedLabel,
+  isSaved = false, onToggleSave, savingBookmark = false,
 }: {
   pkg: Pkg
   applicantCount: number
@@ -282,11 +284,49 @@ export default function PackageDetailModal({
   applying?: boolean
   onApply?: () => void
   closedLabel?: string
+  isSaved?: boolean
+  onToggleSave?: () => void
+  savingBookmark?: boolean
 }) {
   const supabase = createClient()
   const isLoan = pkg.package_type === 'สินเชื่อ'
-  const [tab, setTab] = useState<'main' | 'conditions' | 'rate' | 'documents' | 'faq'>('main')
+  const [tab, setTab] = useState<'main' | 'conditions' | 'rate' | 'fees' | 'documents' | 'faq'>('main')
   const ap = APPROVAL_LABELS[pkg.approval_status] ?? APPROVAL_LABELS.pending
+
+  // ป้าย "แนะนำ" — เก็บ state ในตัวเอง เพื่อ toggle ได้ทันทีโดยไม่ต้องรอ refresh หน้า (เฉพาะ mode admin)
+  const [featured, setFeatured] = useState(!!pkg.is_featured)
+  const [featuredBusy, setFeaturedBusy] = useState(false)
+  async function toggleFeatured() {
+    setFeaturedBusy(true)
+    const next = !featured
+    const { error } = await supabase.rpc('admin_set_package_featured', { p_package_id: pkg.id, p_featured: next })
+    setFeaturedBusy(false)
+    if (!error) setFeatured(next)
+  }
+
+  // ปุ่มแชร์ — ใช้ URL ปัจจุบันของหน้า พร้อมแนบ ?package=<id> เพื่อให้เปิดลิงก์แล้วขึ้น modal นี้ตรงกัน
+  const [shareCopied, setShareCopied] = useState(false)
+  function getShareUrl() {
+    if (typeof window === 'undefined') return ''
+    const url = new URL(window.location.href)
+    url.searchParams.set('package', pkg.id)
+    return url.toString()
+  }
+  function shareFacebook() {
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getShareUrl())}`, '_blank', 'noopener,width=600,height=500')
+  }
+  function shareLine() {
+    window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(getShareUrl())}`, '_blank', 'noopener,width=600,height=500')
+  }
+  async function copyShareLink() {
+    try {
+      await navigator.clipboard.writeText(getShareUrl())
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
+    } catch {
+      // เบราว์เซอร์บางตัวไม่รองรับ clipboard API — เงียบไว้ ไม่ต้อง error รบกวนผู้ใช้
+    }
+  }
 
   const [faqs, setFaqs] = useState<FaqRow[] | null>(null)
   useEffect(() => {
@@ -317,6 +357,12 @@ export default function PackageDetailModal({
 
   // จุดเด่น — แยกทีละบรรทัดจาก description ให้เป็นเช็คลิสต์
   const highlightList = (pkg.description ?? '')
+    .split('\n')
+    .map(s => s.trim())
+    .filter(Boolean)
+
+  // เหมาะสำหรับ — แยกทีละบรรทัดจาก support_items
+  const suitableForList = (pkg.support_items ?? '')
     .split('\n')
     .map(s => s.trim())
     .filter(Boolean)
@@ -420,9 +466,50 @@ export default function PackageDetailModal({
                   </button>
                 )
               )}
+
+              {/* ปุ่มบันทึกแพ็กเกจนี้ (เฉพาะ SME) */}
+              {mode === 'sme' && onToggleSave && (
+                <button
+                  className="btn btn-ghost"
+                  disabled={savingBookmark}
+                  onClick={onToggleSave}
+                  style={isSaved ? { color: '#1e3a8a', borderColor: '#1e3a8a' } : undefined}>
+                  {isSaved ? '★ บันทึกแล้ว' : '☆ บันทึกแพ็กเกจนี้'}
+                </button>
+              )}
+
+              {/* ปุ่ม toggle ป้าย "แนะนำ" (เฉพาะ admin) */}
+              {mode === 'admin' && (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  disabled={featuredBusy}
+                  onClick={toggleFeatured}
+                  style={featured ? { color: '#166534', borderColor: '#166534' } : undefined}>
+                  {featuredBusy ? 'กำลังบันทึก…' : featured ? '✓ ตั้งเป็นแนะนำแล้ว' : '☆ ตั้งเป็นแนะนำ'}
+                </button>
+              )}
+
               {mode === 'sme' && agencyContact && (
                 <div style={{ fontSize: 12, color: '#64748b' }}>ติดต่อ: {agencyContact}</div>
               )}
+
+              {/* แถบแชร์ */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>แชร์:</span>
+                <button type="button" onClick={shareLine} title="แชร์ผ่าน LINE" style={{
+                  width: 30, height: 30, borderRadius: '50%', border: '1px solid #e2e8f0', background: '#fff',
+                  cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>💬</button>
+                <button type="button" onClick={shareFacebook} title="แชร์ผ่าน Facebook" style={{
+                  width: 30, height: 30, borderRadius: '50%', border: '1px solid #e2e8f0', background: '#fff',
+                  cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>📘</button>
+                <button type="button" onClick={copyShareLink} title="คัดลอกลิงก์" style={{
+                  width: 30, height: 30, borderRadius: '50%', border: '1px solid #e2e8f0', background: '#fff',
+                  cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>🔗</button>
+                {shareCopied && <span style={{ fontSize: 11, color: '#16a34a' }}>คัดลอกแล้ว!</span>}
+              </div>
 
               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <IconCard icon="🏦" label="ประเภทบริการ" value={pkg.category} />
@@ -439,10 +526,30 @@ export default function PackageDetailModal({
 
               {/* Hero banner */}
               {pkg.cover_banner ? (
-                <div style={{ width: '100%', aspectRatio: '3.2 / 1', maxHeight: 280, background: '#0f172a' }}>
+                <div style={{ position: 'relative', width: '100%', aspectRatio: '3.2 / 1', maxHeight: 280, background: '#0f172a' }}>
                   <img src={pkg.cover_banner.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {featured && (
+                    <span style={{
+                      position: 'absolute', top: 12, left: 12,
+                      background: '#16a34a', color: '#fff', fontSize: 12, fontWeight: 600,
+                      padding: '4px 12px', borderRadius: 6,
+                    }}>
+                      แนะนำ
+                    </span>
+                  )}
                 </div>
-              ) : null}
+              ) : (
+                featured && (
+                  <div style={{ padding: '16px 24px 0 24px' }}>
+                    <span style={{
+                      background: '#16a34a', color: '#fff', fontSize: 12, fontWeight: 600,
+                      padding: '4px 12px', borderRadius: 6,
+                    }}>
+                      แนะนำ
+                    </span>
+                  </div>
+                )
+              )}
 
               {/* Tabs */}
               <div style={{
@@ -455,7 +562,12 @@ export default function PackageDetailModal({
                 </button>
                 {isLoan && (
                   <button onClick={() => setTab('rate')} style={tabBtnStyle(tab === 'rate')}>
-                    📊 อัตราดอกเบี้ย/ค่าธรรมเนียม
+                    📊 อัตราดอกเบี้ย
+                  </button>
+                )}
+                {isLoan && (
+                  <button onClick={() => setTab('fees')} style={tabBtnStyle(tab === 'fees')}>
+                    💳 ค่าธรรมเนียม
                   </button>
                 )}
                 <button onClick={() => setTab('documents')} style={tabBtnStyle(tab === 'documents')}>
@@ -477,6 +589,20 @@ export default function PackageDetailModal({
                       </div>
                     )}
 
+                    {suitableForList.length > 0 && (
+                      <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: 14 }}>
+                        <h3 style={{ fontSize: 14, margin: '0 0 10px', color: '#1e3a8a' }}>เหมาะสำหรับ</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {suitableForList.map((item, i) => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: '#1e40af' }}>
+                              <span style={{ flexShrink: 0 }}>🎯</span>
+                              <span>{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {sliderImages.length > 0 && (
                       <div>
                         <ImageSlider images={sliderImages} />
@@ -491,7 +617,6 @@ export default function PackageDetailModal({
                       <h3 style={{ fontSize: 15, margin: '0 0 10px' }}>คุณสมบัติและเงื่อนไข</h3>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
                         <IconCard icon="✅" label="คุณสมบัติผู้ได้รับ" value={pkg.eligibility_criteria} />
-                        <IconCard icon="🎁" label="สิ่งที่สนับสนุน" value={pkg.support_items} />
                         <IconCard icon="💼" label="รูปแบบทุน" value={pkg.funding_type} />
                         <IconCard icon="📝" label="รายละเอียดวงเงิน" value={pkg.price_note} />
                         {isLoan && <IconCard icon="📄" label="รายละเอียดหลักประกัน" value={pkg.collateral_detail} />}
@@ -549,8 +674,12 @@ export default function PackageDetailModal({
                     </div>
 
                     <Field label="เงื่อนไข / หมายเหตุอัตราดอกเบี้ย" value={rate.rate_conditions} />
+                  </>
+                )}
 
-                    {rate.fee_items.length > 0 && (
+                {tab === 'fees' && rate && (
+                  <>
+                    {rate.fee_items.length > 0 ? (
                       <div>
                         <h3 style={{ fontSize: 15, margin: '0 0 10px' }}>ค่าธรรมเนียมและค่าใช้จ่ายที่เกี่ยวข้อง</h3>
                         <div style={{ overflowX: 'auto' }}>
@@ -576,6 +705,8 @@ export default function PackageDetailModal({
                           </table>
                         </div>
                       </div>
+                    ) : (
+                      <p style={{ fontSize: 13, color: '#94a3b8' }}>ยังไม่มีข้อมูลค่าธรรมเนียมสำหรับบริการนี้</p>
                     )}
 
                     <Field label="หมายเหตุค่าธรรมเนียม" value={rate.fee_notes} />
