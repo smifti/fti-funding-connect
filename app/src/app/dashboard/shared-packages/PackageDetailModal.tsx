@@ -474,7 +474,7 @@ export default function PackageDetailModal({
                   disabled={savingBookmark}
                   onClick={onToggleSave}
                   style={isSaved ? { color: '#1e3a8a', borderColor: '#1e3a8a' } : undefined}>
-                  {isSaved ? '★ บันทึกแล้ว' : '☆ บันทึกแพ็กเกจนี้'}
+                  {isSaved ? '★ บันทึกแล้ว' : '☆ บันทึกบริการนี้'}
                 </button>
               )}
 
