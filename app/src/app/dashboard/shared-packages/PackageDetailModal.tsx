@@ -285,7 +285,7 @@ export default function PackageDetailModal({
 }) {
   const supabase = createClient()
   const isLoan = pkg.package_type === 'สินเชื่อ'
-  const [tab, setTab] = useState<'main' | 'rate' | 'documents' | 'faq'>('main')
+  const [tab, setTab] = useState<'main' | 'conditions' | 'rate' | 'documents' | 'faq'>('main')
   const ap = APPROVAL_LABELS[pkg.approval_status] ?? APPROVAL_LABELS.pending
 
   const [faqs, setFaqs] = useState<FaqRow[] | null>(null)
@@ -373,7 +373,9 @@ export default function PackageDetailModal({
                 width: 80, height: 80, borderRadius: 14, border: '1px solid #e2e8f0',
                 background: '#f8fafc', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                {agencyLogo ? (
+                {pkg.cover_square ? (
+                  <img src={pkg.cover_square.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : agencyLogo ? (
                   <img src={agencyLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 ) : (
                   <span style={{ fontSize: 28 }}>🏢</span>
@@ -381,7 +383,8 @@ export default function PackageDetailModal({
               </div>
 
               <div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{agencyDisplayName}</div>
+                <h2 style={{ margin: 0, fontSize: 17, color: '#1e293b', lineHeight: 1.3 }}>{pkg.title}</h2>
+                <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>{agencyDisplayName}</div>
                 {mode !== 'sme' && (
                   <span style={{
                     display: 'inline-block', marginTop: 6,
@@ -436,33 +439,10 @@ export default function PackageDetailModal({
 
               {/* Hero banner */}
               {pkg.cover_banner ? (
-                <div style={{ position: 'relative', width: '100%', aspectRatio: '3.2 / 1', maxHeight: 280, background: '#0f172a' }}>
+                <div style={{ width: '100%', aspectRatio: '3.2 / 1', maxHeight: 280, background: '#0f172a' }}>
                   <img src={pkg.cover_banner.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <div style={{
-                    position: 'absolute', top: 16, left: 16, right: 60,
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    background: 'rgba(15,23,42,0.55)', borderRadius: 12, padding: '8px 14px 8px 8px',
-                    backdropFilter: 'blur(2px)',
-                  }}>
-                    {pkg.cover_square && (
-                      <img src={pkg.cover_square.url} alt="" style={{
-                        width: 48, height: 48, borderRadius: 8, objectFit: 'cover',
-                        border: '2px solid #fff', flexShrink: 0,
-                      }} />
-                    )}
-                    <h2 style={{ margin: 0, fontSize: 18, color: '#fff', lineHeight: 1.3 }}>{pkg.title}</h2>
-                  </div>
                 </div>
-              ) : (
-                <div style={{ padding: '22px 24px 0 24px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  {pkg.cover_square && (
-                    <img src={pkg.cover_square.url} alt="" style={{
-                      width: 48, height: 48, borderRadius: 8, objectFit: 'cover', border: '1px solid #e2e8f0', flexShrink: 0,
-                    }} />
-                  )}
-                  <h2 style={{ margin: 0, fontSize: 20 }}>{pkg.title}</h2>
-                </div>
-              )}
+              ) : null}
 
               {/* Tabs */}
               <div style={{
@@ -470,6 +450,9 @@ export default function PackageDetailModal({
                 borderBottom: '1px solid #e2e8f0',
               }}>
                 <button onClick={() => setTab('main')} style={tabBtnStyle(tab === 'main')}>ข้อมูลทั่วไป</button>
+                <button onClick={() => setTab('conditions')} style={tabBtnStyle(tab === 'conditions')}>
+                  📋 คุณสมบัติและเงื่อนไข
+                </button>
                 {isLoan && (
                   <button onClick={() => setTab('rate')} style={tabBtnStyle(tab === 'rate')}>
                     📊 อัตราดอกเบี้ย/ค่าธรรมเนียม
@@ -499,7 +482,11 @@ export default function PackageDetailModal({
                         <ImageSlider images={sliderImages} />
                       </div>
                     )}
+                  </>
+                )}
 
+                {tab === 'conditions' && (
+                  <>
                     <div>
                       <h3 style={{ fontSize: 15, margin: '0 0 10px' }}>คุณสมบัติและเงื่อนไข</h3>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
