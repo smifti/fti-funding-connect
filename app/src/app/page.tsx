@@ -47,11 +47,7 @@ export default async function Home() {
         <p style={{ fontSize: 14, color: '#6b7088', marginBottom: 20 }}>
           รวมสินเชื่อและบริการสนับสนุนจากหน่วยงานพันธมิตร — คลิกเพื่อดูรายละเอียด
         </p>
-        {packagesError && (
-          <pre style={{ background: '#fee2e2', padding: 16, borderRadius: 8, fontSize: 12, overflow: 'auto' }}>
-            DEBUG ERROR: {JSON.stringify(packagesError, null, 2)}
-          </pre>
-        )}
+       
         <PublicPackageCatalog packages={packages ?? []} />
       </div>
     </div>
