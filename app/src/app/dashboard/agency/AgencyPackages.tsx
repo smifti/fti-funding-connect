@@ -137,6 +137,7 @@ const EMPTY_FORM = {
   template_type: 'grant',
   category: '',
   title: '',
+  overview: '',
   description: '',
   price_amount: '',
   price_note: '',
@@ -250,6 +251,7 @@ export default function AgencyPackages({
       template_type: p.template_type ?? 'grant',
       category: p.category ?? '',
       title: p.title ?? '',
+      overview: p.overview ?? '',
       description: p.description ?? '',
       price_amount: p.price_amount != null ? String(p.price_amount) : '',
       price_note: p.price_note ?? '',
@@ -460,6 +462,7 @@ export default function AgencyPackages({
       template_type: autoTemplateType,
       category: form.category.trim(),
       title: form.title.trim(),
+      overview: form.overview.trim() || null,
       description: form.description.trim() || null,
       price_amount: form.price_amount ? Number(form.price_amount) : null,
       price_note: form.price_note.trim() || null,
@@ -651,6 +654,14 @@ export default function AgencyPackages({
             <label style={labelStyle}>ชื่อข้อเสนอ/บริการ / โครงการ *</label>
             <input style={fieldStyle} value={form.title} onChange={e => set('title', e.target.value)}
               placeholder="เช่น สินเชื่อ SME ดอกเบี้ยพิเศษ / โครงการสนับสนุน Digital" />
+          </div>
+
+          {/* ภาพรวมบริการ */}
+          <div>
+            <label style={labelStyle}>ภาพรวมบริการ</label>
+            <textarea style={{ ...fieldStyle, minHeight: 70, resize: 'vertical' }}
+              value={form.overview} onChange={e => set('overview', e.target.value)}
+              placeholder="อธิบายภาพรวมของบริการนี้แบบสั้นๆ 2-3 ประโยค" />
           </div>
 
           {/* หมวดหมู่ + ประเภท (แถวเดียวกัน ไม่ยาวเต็มกรอบ) */}
