@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 import PublicPackageCatalog from './PublicPackageCatalog'
 
+export const dynamic = 'force-dynamic'
+
 export default async function Home() {
   const supabase = await createClient()
   const { data: packages } = await supabase.rpc('list_public_packages')
