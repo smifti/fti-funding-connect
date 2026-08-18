@@ -1,5 +1,6 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import ProfileForm from './ProfileForm'
 import SmePackages from './SmePackages'
 import ChangePassword from '@/components/ChangePassword'
@@ -104,8 +105,26 @@ function AppTimeline({ steps }: { steps: Record<string, any> }) {
     </div>
   )
 }
-export default function SmeTabs({ sme, requests, health, packages, appliedIds, myApplications }: { sme: any; requests: any[]; health: any; packages: any[]; appliedIds: string[]; myApplications: any[] }) {
+export default function SmeTabs({
+  sme, requests, health, packages, appliedIds, savedIds, myApplications,
+}: {
+  sme: any
+  requests: any[]
+  health: any
+  packages: any[]
+  appliedIds: string[]
+  savedIds: string[]
+  myApplications: any[]
+}) {
+  const searchParams = useSearchParams()
   const [tab, setTab] = useState<'overview' | 'packages' | 'profile' | 'settings'>('overview')
+
+  // ถ้ามาจากลิงก์แชร์ (?package=xxx) ให้สลับไปแท็บ "แพ็กเกจสนับสนุน" อัตโนมัติ
+  // ตัวโมดัลจริงจะถูกเปิดโดย SmePackages เอง (เช็ค query เดียวกัน)
+  useEffect(() => {
+    if (searchParams.get('package')) setTab('packages')
+  }, [])
+
   const status = getStatus(sme)
   const info = STATUS_INFO[status]
   const tabStyle = (active: boolean) => ({
@@ -187,7 +206,7 @@ export default function SmeTabs({ sme, requests, health, packages, appliedIds, m
         </>
       )}
       {tab === 'packages' && (
-        <SmePackages smeId={sme.id} packages={packages} appliedIds={appliedIds} />
+        <SmePackages smeId={sme.id} packages={packages} appliedIds={appliedIds} savedIds={savedIds} />
       )}
       {tab === 'profile' && (
         <>
