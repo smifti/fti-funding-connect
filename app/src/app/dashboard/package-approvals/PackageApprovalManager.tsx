@@ -11,6 +11,15 @@ type ImageMeta = {
   uploaded_at: string | null
 }
 
+type LogRow = {
+  id: string
+  new_status: string
+  note: string | null
+  changed_by_name: string | null
+  changed_by_role: string | null
+  created_at: string
+}
+
 type Pkg = {
   id: string
   owner_id: string
@@ -42,9 +51,17 @@ type Pkg = {
   detail_images: ImageMeta[] | null
   package_rate_structures?: any | null
   profiles: { agency_name: string | null; full_name: string | null; agency_logo: string | null } | null
+  package_approval_logs?: LogRow[]
 }
 
 type TabKey = 'pending' | 'approved' | 'rejected'
+
+const STATUS_LABEL: Record<string, string> = {
+  approved: 'อนุมัติ', rejected: 'ไม่อนุมัติ', pending: 'กลับเป็นรอ',
+}
+const ROLE_LABEL: Record<string, string> = {
+  admin: 'ผู้ดูแลระบบ', expert: 'ที่ปรึกษา',
+}
 
 // กลุ่มของบริการทั้งหมดที่เป็นของหน่วยงาน (agency) เดียวกัน ในแท็บสถานะเดียวกัน
 type AgencyGroup = {
@@ -76,10 +93,11 @@ function groupByAgency(pkgs: Pkg[]): AgencyGroup[] {
 }
 
 export default function PackageApprovalManager({
-  initial, applicantCounts,
+  initial, applicantCounts, currentUser,
 }: {
   initial: Pkg[]
   applicantCounts: Record<string, number>
+  currentUser: { id: string; name: string; role: string }
 }) {
   const router = useRouter()
   const supabase = createClient()
@@ -89,15 +107,27 @@ export default function PackageApprovalManager({
   const [rejectNote, setRejectNote] = useState('')
   const [detail, setDetail] = useState<Pkg | null>(null)
   const [tab, setTab] = useState<TabKey>('pending') // default = รออนุมัติ
+  const [showLog, setShowLog] = useState<string | null>(null)
 
-  async function decide(id: string, status: 'approved' | 'rejected' | 'pending') {
+  async function decide(id: string, status: 'approved' | 'rejected' | 'pending', note: string | null = null) {
     setBusy(id); setMsg('')
     const { error } = await supabase
       .from('packages')
       .update({ approval_status: status })
       .eq('id', id)
+    if (error) { setBusy(null); setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
+
+    // บันทึกประวัติการปรับปรุง — ใครเปลี่ยนสถานะเป็นอะไร เมื่อไหร่
+    await supabase.from('package_approval_logs').insert({
+      package_id: id,
+      new_status: status,
+      note,
+      changed_by: currentUser.id,
+      changed_by_name: currentUser.name,
+      changed_by_role: currentUser.role,
+    })
+
     setBusy(null)
-    if (error) { setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
     setRejectFor(null); setRejectNote('')
     router.refresh()
   }
@@ -112,6 +142,7 @@ export default function PackageApprovalManager({
 
   // แถวบรรทัดเดียวของบริการ 1 รายการ (ไม่โชว์ชื่อ agency ซ้ำ เพราะย้ายไปอยู่หัวการ์ดกลุ่มแล้ว)
   function compactRow(p: Pkg, statusLabel: { text: string; bg: string; color: string }, actions: React.ReactNode, extra?: React.ReactNode) {
+    const logs = p.package_approval_logs ?? []
     return (
       <div key={p.id} style={{ borderTop: '1px solid #f1f5f9' }}>
         <div style={{ padding: '12px 16px',
@@ -129,6 +160,32 @@ export default function PackageApprovalManager({
           </div>
         </div>
         {extra}
+        {logs.length > 0 && (
+          <div style={{ padding: '0 16px 12px' }}>
+            <button
+              onClick={() => setShowLog(showLog === p.id ? null : p.id)}
+              style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#1e3a8a',
+                fontSize: 13, padding: 0 }}>
+              {showLog === p.id ? '▼' : '▶'} ประวัติการปรับปรุง ({logs.length})
+            </button>
+            {showLog === p.id && (
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {logs.map(log => (
+                  <div key={log.id} style={{ fontSize: 12, color: '#475569',
+                    background: '#f8fafc', borderRadius: 6, padding: '6px 10px' }}>
+                    <strong>{log.changed_by_name ?? '—'}</strong>
+                    <span style={{ color: '#94a3b8' }}> ({ROLE_LABEL[log.changed_by_role ?? ''] ?? log.changed_by_role})</span>
+                    {' '}เปลี่ยนสถานะเป็น <strong>{STATUS_LABEL[log.new_status] ?? log.new_status}</strong>
+                    {log.note && <span style={{ color: '#991b1b' }}> — {log.note}</span>}
+                    <div style={{ color: '#94a3b8', marginTop: 2 }}>
+                      {new Date(log.created_at).toLocaleString('th-TH')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     )
   }
@@ -240,7 +297,7 @@ export default function PackageApprovalManager({
                   />
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button className="btn btn-sm" disabled={busy === p.id}
-                      onClick={() => decide(p.id, 'rejected')}>
+                      onClick={() => decide(p.id, 'rejected', rejectNote.trim())}>
                       {busy === p.id ? '…' : 'ยืนยันไม่อนุมัติ'}
                     </button>
                     <button className="btn btn-sm btn-ghost" disabled={busy === p.id}
