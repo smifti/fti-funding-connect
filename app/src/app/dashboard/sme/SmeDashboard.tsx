@@ -65,7 +65,7 @@ export default async function SmeDashboard({ userId }: { userId: string }) {
       )
     `)
     .eq('approval_status', 'approved')
-    .order('created_at', { ascending: false })e })
+    .order('created_at', { ascending: false })
   // แพ็กเกจที่ SME นี้สมัครไปแล้ว (พร้อม timeline)
   const { data: apps } = await supabase
     .from('package_applications')
