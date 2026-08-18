@@ -231,7 +231,7 @@ export default function SmePackages({
                   }}>
                   {isSaved ? '★' : '☆'}
                 </button>
-                <div style={{ height: 140, background: '#f1f5f9', flexShrink: 0 }}>
+                <div style={{ width: '100%', aspectRatio: '3.2 / 1', background: '#f1f5f9', flexShrink: 0 }}>
                   {coverUrl ? (
                     <img src={coverUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
