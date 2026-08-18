@@ -90,4 +90,3 @@ export default async function SmeDashboard({ userId }: { userId: string }) {
     />
   )
 }
-}
