@@ -368,7 +368,62 @@ function AgencyProfileFormReady({
             {busy ? 'กำลังบันทึก…' : 'บันทึกข้อมูล'}
           </button>
         </div>
+
+        <AgencyEditHistory supabase={supabase} agencyId={agency.id} refreshKey={msg} />
       </div>
+    </div>
+  )
+}
+
+function AgencyEditHistory({
+  supabase, agencyId, refreshKey,
+}: {
+  supabase: ReturnType<typeof createClient>
+  agencyId: string
+  refreshKey: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [logs, setLogs] = useState<{ id: string; changed_by_name: string | null; changed_by_role: string | null; created_at: string }[] | null>(null)
+
+  async function toggle() {
+    if (open) { setOpen(false); return }
+    setOpen(true)
+    const { data, error } = await supabase.rpc('get_my_agency_edit_logs')
+    if (!error) setLogs(data ?? [])
+  }
+
+  // เมื่อบันทึกสำเร็จ (refreshKey เปลี่ยน) ให้ล้าง cache เพื่อโหลดใหม่รอบหน้าที่เปิด
+  useEffect(() => { setLogs(null) }, [refreshKey])
+
+  const ROLE_LABEL: Record<string, string> = { agency: 'หน่วยงาน', expert: 'ที่ปรึกษา', admin: 'ผู้ดูแลระบบ' }
+
+  return (
+    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 10 }}>
+      <button
+        onClick={toggle}
+        style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#1e3a8a', fontSize: 13, padding: 0 }}>
+        {open ? '▼' : '▶'} ประวัติการแก้ไข
+      </button>
+      {open && (
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {logs === null ? (
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>กำลังโหลด…</span>
+          ) : logs.length === 0 ? (
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>ยังไม่มีประวัติการแก้ไข</span>
+          ) : (
+            logs.map(log => (
+              <div key={log.id} style={{ fontSize: 12, color: '#475569', background: '#f8fafc', borderRadius: 6, padding: '6px 10px' }}>
+                <strong>{log.changed_by_name ?? '—'}</strong>
+                <span style={{ color: '#94a3b8' }}> ({ROLE_LABEL[log.changed_by_role ?? ''] ?? log.changed_by_role})</span>
+                {' '}แก้ไขข้อมูลหน่วยงาน
+                <div style={{ color: '#94a3b8', marginTop: 2 }}>
+                  {new Date(log.created_at).toLocaleString('th-TH')}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   )
 }
