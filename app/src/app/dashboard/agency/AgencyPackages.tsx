@@ -60,6 +60,20 @@ const LOAN_TYPE_OPTIONS = [
 
 const COLLATERAL_OPTIONS = ['ไม่ใช้หลักประกัน', 'ใช้หลักประกัน', 'ใช้บุคคลค้ำประกัน', 'อื่นๆ']
 
+// รายการเอกสารที่ใช้บ่อย — เลือกจาก dropdown ได้ หรือพิมพ์เองผ่าน "อื่นๆ"
+const DOCUMENT_OPTIONS = [
+  'สำเนาบัตรประชาชนผู้มีอำนาจลงนาม',
+  'สำเนาทะเบียนบ้าน',
+  'หนังสือรับรองบริษัท (ไม่เกิน 3 เดือน)',
+  'สำเนาบัญชีรายชื่อผู้ถือหุ้น',
+  'งบการเงินย้อนหลัง 2-3 ปี',
+  'Statement ธนาคารย้อนหลัง 6 เดือน',
+  'สำเนาทะเบียนภาษีมูลค่าเพิ่ม (ภ.พ.20)',
+  'สำเนาใบทะเบียนการค้า / ทะเบียนพาณิชย์',
+  'แผนธุรกิจ / เอกสารประกอบการขอสินเชื่อ',
+  'เอกสารหลักประกัน (ถ้ามี)',
+]
+
 // metadata รูปภาพ 1 รูป (ใช้ทั้งภาพหน้าปกและรูปรายละเอียด)
 export type ImageMeta = {
   url: string
@@ -159,9 +173,7 @@ export default function AgencyPackages({
   const [form, setForm] = useState({ ...EMPTY_FORM })
 
   // ด้านที่เกี่ยวข้อง / ประเภทสินเชื่อ (tag สะสม)
-  const [sectorTags, setSectorTags] = useState<string[]>([])
-  const [sectorPick, setSectorPick] = useState('') // ค่าที่เลือกจาก dropdown หรือพิมพ์เอง (กรณีไม่ใช่สินเชื่อ)
-
+  st [sectorTags, setSectorTags] = useState<string[]>
   // ภาพหน้าปก 2 แบบ: ไฟล์ใหม่ที่เลือก (ยังไม่ upload) + metadata เดิมจาก DB (ถ้ามี, ตอนแก้ไข)
   const [coverBannerFile, setCoverBannerFile] = useState<File | null>(null)
   const [coverBannerExisting, setCoverBannerExisting] = useState<ImageMeta | null>(null)
@@ -200,6 +212,8 @@ export default function AgencyPackages({
     resetFaqForm()
     setSectorTags([])
     setSectorPick('')
+    setDocTags([])
+    setDocPick('')
     setCoverBannerFile(null)
     setCoverBannerExisting(null)
     setCoverSquareFile(null)
@@ -253,6 +267,8 @@ export default function AgencyPackages({
     setCoverSquareExisting(p.cover_square ?? null)
     setSectorTags(p.related_sectors ?? [])
     setSectorPick('')
+    setDocTags((p.required_documents ?? '').split('\n').map(s => s.trim()).filter(Boolean))
+    setDocPick('')
     setExistingDetailImages(p.detail_images ?? [])
     setNewDetailFiles([])
     setRateStructure(rateStructureFromRow(p.package_rate_structures))
@@ -319,6 +335,18 @@ export default function AgencyPackages({
 
   function removeSectorTag(val: string) {
     setSectorTags(tags => tags.filter(t => t !== val))
+  }
+
+  function addDocTag() {
+    const val = docPick.trim()
+    if (!val) return
+    if (docTags.includes(val)) { setDocPick(''); return }
+    setDocTags(tags => [...tags, val])
+    setDocPick('')
+  }
+
+  function removeDocTag(val: string) {
+    setDocTags(tags => tags.filter(t => t !== val))
   }
 
   const MAX_DETAIL_IMAGES = 10
@@ -444,7 +472,7 @@ export default function AgencyPackages({
       collateral_required: isLoan ? (form.collateral_required || null) : null,
       collateral_detail: isLoan ? (form.collateral_detail.trim() || null) : null,
       detail_images: finalDetailImages.length > 0 ? finalDetailImages : null,
-      required_documents: form.required_documents.trim() || null,
+      required_documents: docTags.length > 0 ? docTags.join('\n') : null,
     }
     if (coverBannerMeta !== undefined) payload.cover_banner = coverBannerMeta
     if (coverSquareMeta !== undefined) payload.cover_square = coverSquareMeta
@@ -822,10 +850,41 @@ export default function AgencyPackages({
           </div>
 
           <div>
-            <label style={labelStyle}>เอกสารที่ต้องใช้ (พิมพ์ทีละบรรทัด)</label>
-            <textarea style={{ ...fieldStyle, minHeight: 100, resize: 'vertical' }}
-              value={form.required_documents} onChange={e => set('required_documents', e.target.value)}
-              placeholder={'เช่น\nสำเนาบัตรประชาชนผู้กู้\nหนังสือรับรองบริษัท (ไม่เกิน 3 เดือน)\nงบการเงินย้อนหลัง 2 ปี'} />
+            <label style={labelStyle}>เอกสารที่ต้องใช้</label>
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <select style={{ ...fieldStyle, marginTop: 0, flex: 1 }} value={docPick} onChange={e => setDocPick(e.target.value)}>
+                <option value="">-- เลือกเอกสาร --</option>
+                {DOCUMENT_OPTIONS.filter(o => !docTags.includes(o)).map(o => <option key={o} value={o}>{o}</option>)}
+                <option value="__other__">อื่นๆ (พิมพ์เอง)</option>
+              </select>
+              <button type="button" className="btn btn-sm" onClick={addDocTag} style={{ flexShrink: 0 }}>
+                + เพิ่ม
+              </button>
+            </div>
+            {docPick === '__other__' && (
+              <input
+                style={{ ...fieldStyle }}
+                placeholder="ระบุเอกสารอื่นๆ แล้วกด Enter หรือ + เพิ่ม"
+                onChange={e => setDocPick(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDocTag() } }}
+              />
+            )}
+            {docTags.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                {docTags.map(tag => (
+                  <span key={tag} style={{
+                    background: '#e0f2fe', color: '#0369a1', fontSize: 12,
+                    padding: '4px 8px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    {tag}
+                    <button type="button" onClick={() => removeDocTag(tag)}
+                      style={{ border: 'none', background: 'none', color: '#0369a1', cursor: 'pointer', fontWeight: 700, lineHeight: 1, padding: 0 }}>
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {editId && (
