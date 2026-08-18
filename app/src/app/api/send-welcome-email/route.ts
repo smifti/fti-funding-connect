@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sendEmail } from '@/lib/resend'
 
 const LOGO_URL = 'https://jvlakqyqyhaqcsvusgtg.supabase.co/storage/v1/object/public/assets/FDC_Logo01.png'
-const LOGIN_URL = 'https://fti-funding-connect.vercel.app/login'
+const LOGIN_URL = 'https://ftifunding.com/login'
 
 function buildWelcomeEmailHtml(name: string): string {
   const displayName = name?.trim() ? name.trim() : 'สมาชิกใหม่'
