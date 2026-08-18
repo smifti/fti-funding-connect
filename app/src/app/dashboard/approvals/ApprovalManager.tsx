@@ -2,13 +2,14 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
+import ApplicantDetailModal from './ApplicantDetailModal'
 
 const ROLE_LABEL: Record<string, string> = {
   agency: 'หน่วยงาน / ผู้ให้บริการ',
   expert: 'ที่ปรึกษา / ผู้เชี่ยวชาญ',
   sme: 'ผู้ประกอบการ SME',
 }
-const CATEGORY_LABELS: Record<string, string> = {
+export const CATEGORY_LABELS: Record<string, string> = {
   credit: 'สินเชื่อ', innovation: 'นวัตกรรม', management: 'บริหารจัดการ',
   marketing: 'การตลาด', production: 'การผลิต', upskill: 'Upskill / Reskill',
   other: 'อื่น ๆ (ESG)',
@@ -22,6 +23,14 @@ type User = {
   agency_categories: string[] | null
   approval_status: string | null
   requested_role: string | null
+  phone: string | null
+  agency_email: string | null
+  agency_website: string | null
+  agency_description: string | null
+  agency_logo: string | null
+  created_at: string | null
+  approval_confirmation_token: string | null
+  approval_confirmed_at: string | null
 }
 
 export default function ApprovalManager({ initialUsers }: { initialUsers: User[] }) {
@@ -30,13 +39,38 @@ export default function ApprovalManager({ initialUsers }: { initialUsers: User[]
   const [tab, setTab] = useState<'agency' | 'expert'>('agency')
   const [msg, setMsg] = useState('')
   const [working, setWorking] = useState<string | null>(null)
+  const [detailUser, setDetailUser] = useState<User | null>(null)
 
-  async function approve(userId: string, name: string) {
-    setWorking(userId); setMsg('')
-    const { error } = await supabase.rpc('admin_approve_user', { target_user_id: userId })
+  async function approve(u: User) {
+    const name = u.full_name || u.email
+    setWorking(u.id); setMsg('')
+    const { error } = await supabase.rpc('admin_approve_user', { target_user_id: u.id })
+    if (error) {
+      setWorking(null)
+      setMsg('เกิดข้อผิดพลาด: ' + error.message)
+      return
+    }
+
+    // ส่งอีเมลให้กดยืนยันกลับ (ไม่ block การอนุมัติแม้ส่งอีเมลไม่สำเร็จ)
+    let emailNote = ''
+    try {
+      const res = await fetch('/api/send-approval-confirmation-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: u.email,
+          name: u.full_name || u.agency_name || '',
+          token: u.approval_confirmation_token,
+        }),
+      })
+      const data = await res.json()
+      if (!data.ok) emailNote = ' (ส่งอีเมลยืนยันไม่สำเร็จ กรุณาแจ้งผู้ดูแลระบบ)'
+    } catch {
+      emailNote = ' (ส่งอีเมลยืนยันไม่สำเร็จ กรุณาแจ้งผู้ดูแลระบบ)'
+    }
+
     setWorking(null)
-    if (error) { setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
-    setMsg(`อนุมัติ ${name} เรียบร้อยแล้ว`)
+    setMsg(`อนุมัติ ${name} เรียบร้อยแล้ว ระบบได้ส่งอีเมลให้ยืนยันตัวตนแล้ว${emailNote}`)
     router.refresh()
   }
 
@@ -90,19 +124,35 @@ export default function ApprovalManager({ initialUsers }: { initialUsers: User[]
             <span style={{ background: '#fef9c3', color: '#a16207', fontSize: 12,
               padding: '3px 10px', borderRadius: 10, fontWeight: 600 }}>รออนุมัติ</span>
           ) : (
-            <span style={{ background: '#dcfce7', color: '#166534', fontSize: 12,
-              padding: '3px 10px', borderRadius: 10, fontWeight: 600 }}>อนุมัติแล้ว</span>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{ background: '#dcfce7', color: '#166534', fontSize: 12,
+                padding: '3px 10px', borderRadius: 10, fontWeight: 600 }}>อนุมัติแล้ว</span>
+              {u.approval_confirmed_at ? (
+                <span style={{ background: '#dcfce7', color: '#166534', fontSize: 12,
+                  padding: '3px 10px', borderRadius: 10, fontWeight: 600 }}>ยืนยันอีเมลแล้ว</span>
+              ) : (
+                <span style={{ background: '#fef3c7', color: '#b45309', fontSize: 12,
+                  padding: '3px 10px', borderRadius: 10, fontWeight: 600 }}>รอยืนยันอีเมล</span>
+              )}
+            </div>
           )}
         </td>
         <td>
-          {isPending ? (
-            <button className="btn btn-sm" disabled={working === u.id}
-              onClick={() => approve(u.id, u.full_name || u.email)}>
-              {working === u.id ? 'กำลังอนุมัติ…' : '✓ อนุมัติ'}
-            </button>
-          ) : (
-            <span style={{ fontSize: 13, color: 'var(--muted)' }}>—</span>
-          )}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {isPending && (
+              <button className="btn btn-ghost btn-sm" onClick={() => setDetailUser(u)}>
+                ดูข้อมูล
+              </button>
+            )}
+            {isPending ? (
+              <button className="btn btn-sm" disabled={working === u.id}
+                onClick={() => approve(u)}>
+                {working === u.id ? 'กำลังอนุมัติ…' : '✓ อนุมัติ'}
+              </button>
+            ) : (
+              !isPending && <span style={{ fontSize: 13, color: 'var(--muted)' }}>—</span>
+            )}
+          </div>
         </td>
       </tr>
     )
@@ -151,6 +201,10 @@ export default function ApprovalManager({ initialUsers }: { initialUsers: User[]
           </table>
         )}
       </div>
+
+      {detailUser && (
+        <ApplicantDetailModal user={detailUser} onClose={() => setDetailUser(null)} />
+      )}
     </div>
   )
 }
