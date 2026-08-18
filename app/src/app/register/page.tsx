@@ -36,15 +36,16 @@ export default function RegisterPage() {
     : roleType === 'agency' ? 'สถาบันการเงิน, หน่วยงานภาครัฐ, หน่วยร่วมดำเนินการ ฯลฯ (รอ ส.อ.ท. อนุมัติ)'
     : 'คัดกรองคำขอ (รอ ส.อ.ท. อนุมัติ)'
 
-  // ส่งอีเมลต้อนรับหลังลงทะเบียนสำเร็จ (เฉพาะ SME เท่านั้น — agency/expert ยังต้องรอ admin อนุมัติ ไม่ส่งอีเมล)
+  // ส่งอีเมลยืนยันตัวตนหลังลงทะเบียนสำเร็จ (เฉพาะ SME เท่านั้น — agency/expert ยังต้องรอ admin อนุมัติก่อน
+  // ค่อยได้รับอีเมลยืนยันตอน admin กดอนุมัติ ไม่ใช่ตอนสมัคร)
   // ไม่ block การลงทะเบียนถ้าส่งอีเมลไม่สำเร็จ (แค่ log ไว้เฉยๆ เพราะ signUp() ผ่านไปแล้ว ผู้ใช้ควรลงทะเบียนสำเร็จอยู่ดี)
-  async function sendWelcomeEmailIfSme() {
-    if (roleType !== 'sme') return
+  async function sendConfirmationEmailIfSme(userId: string | undefined) {
+    if (roleType !== 'sme' || !userId) return
     try {
-      await fetch('/api/send-welcome-email', {
+      await fetch('/api/send-signup-confirmation-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: form.email, name: form.coordName }),
+        body: JSON.stringify({ userId }),
       })
     } catch {
       // เงียบไว้ — ไม่ต้องแจ้ง error ให้ผู้ใช้เห็น เพราะการลงทะเบียนสำเร็จแล้ว ไม่ควรทำให้ผู้ใช้กังวล
@@ -75,7 +76,7 @@ export default function RegisterPage() {
       }
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data: signUpData, error } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
       options: {
@@ -108,10 +109,10 @@ export default function RegisterPage() {
 
     setLoading(false)
 
-    // ส่งอีเมลต้อนรับ (เฉพาะ SME) — ทำแบบ fire-and-forget ไม่รอผลลัพธ์ ไม่ block หน้าจอ
-    sendWelcomeEmailIfSme()
+    // ส่งอีเมลยืนยันตัวตน (เฉพาะ SME) — ทำแบบ fire-and-forget ไม่รอผลลัพธ์ ไม่ block หน้าจอ
+    sendConfirmationEmailIfSme(signUpData.user?.id)
 
-    // เปิดใช้งาน Email Confirmation แล้ว — ผู้ใช้ทุก role ต้องคลิกยืนยันในอีเมลก่อนถึงจะเข้าสู่ระบบได้
+    // ผู้ใช้ทุก role ต้องคลิกยืนยันตัวตนในอีเมลก่อนถึงจะเข้าสู่ระบบได้
     // จึงไม่ redirect ไปหน้า login ทันที แค่แจ้งให้ไปตรวจสอบอีเมล
     setOk('กรุณาตรวจสอบอีเมลที่ลงทะเบียน เพื่อยืนยันตัวตนก่อนเข้าสู่ระบบ')
   }
