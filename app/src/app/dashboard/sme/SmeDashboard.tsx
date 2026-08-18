@@ -51,9 +51,21 @@ export default async function SmeDashboard({ userId }: { userId: string }) {
   // แพ็กเกจที่อนุมัติแล้ว + เปิดอยู่ (RLS กรองให้เห็นเฉพาะที่ approved+active)
   const { data: packages } = await supabase
     .from('packages')
-    .select('id, template_type, category, title, description, price_amount, price_note, funding_type, support_items, target_sme, target_industry, open_period, image_url, service_status, profiles(agency_name, agency_email, phone)')
+    .select(`
+      id, template_type, category, title, description, price_amount, price_note,
+      funding_type, support_items, target_sme, target_industry, open_period, image_url,
+      approval_status, is_active, service_status,
+      package_type, related_sectors, min_amount, max_amount, eligibility_criteria,
+      loan_term, collateral_required, collateral_detail,
+      cover_banner, cover_square, detail_images, required_documents,
+      package_rate_structures(*),
+      profiles (
+        full_name, agency_name, agency_email, phone,
+        agencies ( name, logo, description, website, email, contact_name, contact_phone )
+      )
+    `)
     .eq('approval_status', 'approved')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false })e })
   // แพ็กเกจที่ SME นี้สมัครไปแล้ว (พร้อม timeline)
   const { data: apps } = await supabase
     .from('package_applications')
