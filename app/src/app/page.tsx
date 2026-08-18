@@ -6,7 +6,9 @@ export const dynamic = 'force-dynamic'
 
 export default async function Home() {
   const supabase = await createClient()
-  const { data: packages } = await supabase.rpc('list_public_packages')
+  const { data: packages, error: packagesError } = await supabase.rpc('list_public_packages')
+  console.log('DEBUG packages:', packages)
+  console.log('DEBUG packagesError:', packagesError)
 
   return (
     <div style={{ minHeight: '100vh', background: '#f6f7fb' }}>
@@ -47,6 +49,12 @@ export default async function Home() {
         <p style={{ fontSize: 14, color: '#6b7088', marginBottom: 20 }}>
           รวมสินเชื่อและบริการสนับสนุนจากหน่วยงานพันธมิตร — คลิกเพื่อดูรายละเอียด
         </p>
+        {packagesError && (
+          <pre style={{ background: '#fee2e2', padding: 16, borderRadius: 8, fontSize: 12, overflow: 'auto' }}>
+            DEBUG ERROR: {JSON.stringify(packagesError, null, 2)}
+          </pre>
+        )}
+        <p style={{ fontSize: 12, color: '#94a3b8' }}>DEBUG: จำนวนที่ได้ = {packages?.length ?? 'null/undefined'}</p>
         <PublicPackageCatalog packages={packages ?? []} />
       </div>
     </div>
