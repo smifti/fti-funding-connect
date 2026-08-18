@@ -6,9 +6,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function Home() {
   const supabase = await createClient()
-  const { data: packages, error: packagesError } = await supabase.rpc('list_public_packages')
-  console.log('DEBUG packages:', packages)
-  console.log('DEBUG packagesError:', packagesError)
+  const { data: packages } = await supabase.rpc('list_public_packages')
 
   return (
     <div style={{ minHeight: '100vh', background: '#f6f7fb' }}>
@@ -54,7 +52,6 @@ export default async function Home() {
             DEBUG ERROR: {JSON.stringify(packagesError, null, 2)}
           </pre>
         )}
-        <p style={{ fontSize: 12, color: '#94a3b8' }}>DEBUG: จำนวนที่ได้ = {packages?.length ?? 'null/undefined'}</p>
         <PublicPackageCatalog packages={packages ?? []} />
       </div>
     </div>
