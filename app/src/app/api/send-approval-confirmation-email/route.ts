@@ -1,0 +1,132 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase-server'
+import { sendEmail } from '@/lib/resend'
+
+const LOGO_URL = 'https://jvlakqyqyhaqcsvusgtg.supabase.co/storage/v1/object/public/assets/FDC_Logo01.png'
+const CONFIRM_BASE_URL = 'https://ftifunding.com/api/confirm-approval'
+
+function buildConfirmEmailHtml(name: string, confirmUrl: string): string {
+  const displayName = name?.trim() ? name.trim() : 'สมาชิก'
+  return `
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ยืนยันตัวตน</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f1f5f9; font-family: 'Segoe UI', Tahoma, Arial, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 560px; background-color:#ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.06);">
+
+          <tr>
+            <td align="center" style="padding: 32px 24px 20px; background-color: #ffffff;">
+              <img src="${LOGO_URL}" alt="FTI SME Funding Connect" width="280" style="display:block; width: 280px; max-width: 100%; height: auto;" />
+            </td>
+          </tr>
+
+          <tr>
+            <td style="height: 4px; background: linear-gradient(90deg, #1e3a8a 0%, #16a34a 100%);"></td>
+          </tr>
+
+          <tr>
+            <td style="padding: 32px 32px 8px;">
+              <h1 style="margin: 0 0 16px; font-size: 20px; color: #1e293b; font-weight: 700;">
+                บัญชีของท่านได้รับการอนุมัติแล้ว ✅
+              </h1>
+              <p style="margin: 0 0 12px; font-size: 15px; line-height: 1.7; color: #334155;">
+                สวัสดีคุณ <strong>${displayName}</strong>
+              </p>
+              <p style="margin: 0 0 12px; font-size: 15px; line-height: 1.7; color: #334155;">
+                บัญชีของท่านได้รับการอนุมัติจาก ส.อ.ท. เรียบร้อยแล้ว ก่อนเข้าใช้งานระบบ
+                <strong>FTI SME Funding Connect</strong> กรุณากดปุ่มด้านล่างเพื่อยืนยันตัวตนของท่านก่อนหนึ่งครั้ง
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding: 16px 32px 32px;">
+              <a href="${confirmUrl}"
+                style="display:inline-block; background-color:#16a34a; color:#ffffff; text-decoration:none;
+                       font-size: 15px; font-weight: 600; padding: 12px 32px; border-radius: 8px;">
+                ยืนยันตัวตน
+              </a>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 0 32px 32px;">
+              <div style="background-color: #f8fafc; border-radius: 10px; padding: 16px 20px;">
+                <p style="margin: 0; font-size: 13px; line-height: 1.7; color: #64748b;">
+                  💡 หลังจากยืนยันตัวตนแล้ว ท่านจะสามารถเข้าสู่ระบบและเริ่มใช้งานได้ทันที
+                  หากปุ่มด้านบนกดไม่ได้ ให้คัดลอกลิงก์นี้ไปวางในเบราว์เซอร์: <br />
+                  <span style="word-break: break-all; color: #2563eb;">${confirmUrl}</span>
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding: 20px 32px; background-color: #f8fafc; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0; font-size: 12px; line-height: 1.6; color: #94a3b8; text-align: center;">
+                อีเมลนี้ส่งจากระบบอัตโนมัติ กรุณาอย่าตอบกลับ<br />
+                © สภาอุตสาหกรรมแห่งประเทศไทย (ส.อ.ท.) — FTI SME Funding Connect
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`.trim()
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ ok: false, error: 'ไม่ได้เข้าสู่ระบบ' }, { status: 401 })
+    }
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ ok: false, error: 'ไม่มีสิทธิ์' }, { status: 403 })
+    }
+
+    const body = await req.json() as { email?: string; name?: string; token?: string }
+    const { email, name, token } = body
+
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return NextResponse.json({ ok: false, error: 'อีเมลไม่ถูกต้อง' }, { status: 400 })
+    }
+    if (!token) {
+      return NextResponse.json({ ok: false, error: 'ไม่มี token สำหรับยืนยันตัวตน' }, { status: 400 })
+    }
+
+    const confirmUrl = `${CONFIRM_BASE_URL}?token=${token}`
+    const html = buildConfirmEmailHtml(name ?? '', confirmUrl)
+
+    const result = await sendEmail({
+      to: email,
+      subject: 'กรุณายืนยันตัวตน — FTI SME Funding Connect',
+      html,
+    })
+
+    if (result.ok === false) {
+      return NextResponse.json({ ok: false, error: result.error }, { status: 200 })
+    }
+
+    return NextResponse.json({ ok: true, id: result.id })
+  } catch (err: any) {
+    return NextResponse.json({ ok: false, error: err?.message || 'เกิดข้อผิดพลาดที่ไม่คาดคิด' }, { status: 200 })
+  }
+}
