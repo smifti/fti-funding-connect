@@ -439,15 +439,27 @@ export default function PackageDetailModal({
                 <div style={{ position: 'relative', width: '100%', aspectRatio: '3.2 / 1', maxHeight: 280, background: '#0f172a' }}>
                   <img src={pkg.cover_banner.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <div style={{
-                    position: 'absolute', inset: 0,
-                    background: 'linear-gradient(0deg, rgba(15,23,42,0.75) 0%, rgba(15,23,42,0.1) 60%)',
-                  }} />
-                  <div style={{ position: 'absolute', left: 20, right: 20, bottom: 16, color: '#fff' }}>
-                    <h2 style={{ margin: 0, fontSize: 20, textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}>{pkg.title}</h2>
+                    position: 'absolute', top: 16, left: 16, right: 60,
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    background: 'rgba(15,23,42,0.55)', borderRadius: 12, padding: '8px 14px 8px 8px',
+                    backdropFilter: 'blur(2px)',
+                  }}>
+                    {pkg.cover_square && (
+                      <img src={pkg.cover_square.url} alt="" style={{
+                        width: 48, height: 48, borderRadius: 8, objectFit: 'cover',
+                        border: '2px solid #fff', flexShrink: 0,
+                      }} />
+                    )}
+                    <h2 style={{ margin: 0, fontSize: 18, color: '#fff', lineHeight: 1.3 }}>{pkg.title}</h2>
                   </div>
                 </div>
               ) : (
-                <div style={{ padding: '22px 24px 0 24px' }}>
+                <div style={{ padding: '22px 24px 0 24px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {pkg.cover_square && (
+                    <img src={pkg.cover_square.url} alt="" style={{
+                      width: 48, height: 48, borderRadius: 8, objectFit: 'cover', border: '1px solid #e2e8f0', flexShrink: 0,
+                    }} />
+                  )}
                   <h2 style={{ margin: 0, fontSize: 20 }}>{pkg.title}</h2>
                 </div>
               )}
@@ -482,16 +494,9 @@ export default function PackageDetailModal({
                       </div>
                     )}
 
-                    {(pkg.cover_square || sliderImages.length > 0) && (
+                    {sliderImages.length > 0 && (
                       <div>
-                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: sliderImages.length > 0 ? 10 : 0 }}>
-                          {pkg.cover_square && (
-                            <img src={pkg.cover_square.url} alt="" style={{
-                              width: 96, height: 96, objectFit: 'cover', borderRadius: 10, border: '1px solid #e2e8f0',
-                            }} />
-                          )}
-                        </div>
-                        {sliderImages.length > 0 && <ImageSlider images={sliderImages} />}
+                        <ImageSlider images={sliderImages} />
                       </div>
                     )}
 
