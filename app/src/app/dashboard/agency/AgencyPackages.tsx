@@ -179,7 +179,17 @@ export default function AgencyPackages({
   // modal ดูรายละเอียดข้อเสนอ/บริการ (read-only)
   const [detailPkg, setDetailPkg] = useState<Pkg | null>(null)
 
+  // ประวัติการแก้ไข — expand/collapse ต่อแถว
   const [showLog, setShowLog] = useState<string | null>(null)
+  const [logsCache, setLogsCache] = useState<Record<string, LogRow[]>>({})
+
+  // คำถามที่พบบ่อย (FAQ) — จัดการเฉพาะตอนแก้ไขบริการที่บันทึกแล้ว
+  const [faqs, setFaqs] = useState<FaqRow[]>([])
+  const [faqLoading, setFaqLoading] = useState(false)
+  const [faqQuestion, setFaqQuestion] = useState('')
+  const [faqAnswer, setFaqAnswer] = useState('')
+  const [faqEditingId, setFaqEditingId] = useState<string | null>(null)
+  const [faqBusy, setFaqBusy] = useState(false)
 
   function set(k: string, v: string) { setForm(f => ({ ...f, [k]: v })) }
 
