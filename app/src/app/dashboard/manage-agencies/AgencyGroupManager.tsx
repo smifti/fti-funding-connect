@@ -30,6 +30,8 @@ type UnassignedUser = {
   agency_email: string | null
   phone: string | null
   created_at: string | null
+  requested_agency_id: string | null
+  requested_agency_name: string | null
 }
 
 type Member = { id: string; email: string; full_name: string | null; role: string; approval_status: string | null }
@@ -224,10 +226,28 @@ export default function AgencyGroupManager({
             <tbody>
               {initialUnassigned.map(u => (
                 <tr key={u.id}>
-                  <td>{u.full_name || '—'}<div style={{ fontSize: 12, color: 'var(--muted)' }}>{u.email}</div></td>
+                  <td>
+                    {u.full_name || '—'}<div style={{ fontSize: 12, color: 'var(--muted)' }}>{u.email}</div>
+                    {u.requested_agency_name && (
+                      <div style={{ fontSize: 12, color: '#1e40af', background: '#dbeafe', display: 'inline-block',
+                        padding: '2px 8px', borderRadius: 8, marginTop: 4, fontWeight: 600 }}>
+                        📩 ขอเข้าร่วม: {u.requested_agency_name}
+                      </div>
+                    )}
+                  </td>
                   <td>{u.agency_name || '—'}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      {u.requested_agency_id && (
+                        <button className="btn btn-sm" disabled={working === u.id}
+                          onClick={() => {
+                            setSelectedAgencyFor(prev => ({ ...prev, [u.id]: u.requested_agency_id! }))
+                            assignToAgency(u.id)
+                          }}
+                          style={{ background: '#16a34a' }}>
+                          ✓ อนุมัติตามคำขอ
+                        </button>
+                      )}
                       <select
                         value={selectedAgencyFor[u.id] ?? ''}
                         onChange={e => setSelectedAgencyFor(prev => ({ ...prev, [u.id]: e.target.value }))}
