@@ -13,17 +13,30 @@ const CATEGORY_LABELS: Record<string, string> = {
   upskill: 'Upskill / Reskill',
   other: 'อื่น ๆ (ESG)',
 }
-// หมุด timeline
+// หมุด timeline (5 จุด — ต้องตรงกับ STEPS ใน AgencyApplicants.tsx)
 const STEPS = [
   { key: 'submitted', label: 'ยื่นสมัคร' },
   { key: 'screening', label: 'พิจารณาคุณสมบัติ' },
-  { key: 'in_progress', label: 'ดำเนินการ' },
+  { key: 'agency_received', label: 'หน่วยงานรับเรื่อง' },
+  { key: 'under_review', label: 'อยู่ระหว่างการพิจารณา' },
   { key: 'completed', label: 'เสร็จสิ้น' },
 ]
+// สถานะที่ถือว่า "ผ่านจุดนี้แล้ว" ต่อ key (ใช้ตัดสินว่าเส้นเชื่อมก่อนหน้าเป็นสีเขียวหรือไม่)
+const ADVANCE_STATE: Record<string, string> = {
+  submitted: 'passed', screening: 'passed', agency_received: 'in_progress',
+  under_review: 'in_progress', completed: 'done',
+}
 const STATE_COLOR: Record<string, { border: string; bg: string; fg: string }> = {
   pending: { border: '#cbd5e1', bg: '#fff', fg: '#94a3b8' },
   passed: { border: '#16a34a', bg: '#16a34a', fg: '#fff' },
   failed: { border: '#dc2626', bg: '#dc2626', fg: '#fff' },
+  coordinating: { border: '#0284c7', bg: '#0284c7', fg: '#fff' },
+  in_progress: { border: '#16a34a', bg: '#16a34a', fg: '#fff' },
+  waiting: { border: '#0284c7', bg: '#0284c7', fg: '#fff' },
+  done: { border: '#16a34a', bg: '#16a34a', fg: '#fff' },
+}
+const STATE_ICON: Record<string, string> = {
+  passed: '✓', done: '✓', in_progress: '✓', failed: '✕', coordinating: '●', waiting: '●',
 }
 // ป้ายสถานะแพ็กเกจ (คำนวณจาก approval_status + service_status)
 function packageStatusBadge(pkg: any): { label: string; bg: string; color: string } | null {
@@ -73,7 +86,8 @@ function AppTimeline({ steps }: { steps: Record<string, any> }) {
       {STEPS.map((step, i) => {
         const st = s[step.key]?.state ?? 'pending'
         const c = STATE_COLOR[st] ?? STATE_COLOR.pending
-        const prevPassed = i > 0 && s[STEPS[i - 1].key]?.state === 'passed'
+        const prevKey = i > 0 ? STEPS[i - 1].key : null
+        const prevPassed = i > 0 && prevKey !== null && s[prevKey]?.state === ADVANCE_STATE[prevKey]
         return (
           <div key={step.key} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
             {i > 0 && (
@@ -87,14 +101,16 @@ function AppTimeline({ steps }: { steps: Record<string, any> }) {
               fontSize: 13, fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              {st === 'passed' ? '✓' : st === 'failed' ? '✕' : i + 1}
+              {STATE_ICON[st] ?? (i + 1)}
             </div>
             <div style={{ fontSize: 11, marginTop: 6,
-              color: st === 'passed' ? '#16a34a' : st === 'failed' ? '#dc2626' : '#94a3b8',
+              color: (st === 'passed' || st === 'done' || st === 'in_progress') ? '#16a34a'
+                : st === 'failed' ? '#dc2626'
+                : (st === 'coordinating' || st === 'waiting') ? '#0284c7' : '#94a3b8',
               fontWeight: st !== 'pending' ? 600 : 400 }}>
               {step.label}
             </div>
-            {st === 'failed' && s[step.key]?.note && (
+            {s[step.key]?.note && (
               <div style={{ fontSize: 11, color: '#dc2626', marginTop: 2, maxWidth: 120, margin: '2px auto 0' }}>
                 {s[step.key].note}
               </div>
