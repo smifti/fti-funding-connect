@@ -7,23 +7,33 @@ import {
   SlaConfig,
 } from '@/lib/sla'
 
-const STEPS = [
-  { key: 'submitted', label: 'ยื่นสมัคร' },
-  { key: 'screening', label: 'พิจารณาคุณสมบัติ' },
-  { key: 'in_progress', label: 'ดำเนินการ' },
-  { key: 'completed', label: 'เสร็จสิ้น' },
+// model ของแต่ละจุด กำหนดว่าใช้ชุดสถานะแบบไหน:
+//   passfail   -> pending / passed / failed (มีเหตุผลตอนไม่ผ่าน)
+//   coordinate -> pending / coordinating / in_progress (ดำเนินการ = ผ่านไปจุดถัดไป)
+//   finish     -> pending / waiting / done (เสร็จสิ้น ต้องมีเหตุผลกำกับ)
+type StepModel = 'passfail' | 'coordinate' | 'finish'
+const STEPS: { key: string; label: string; model: StepModel; roles: string[] }[] = [
+  { key: 'submitted', label: 'ยื่นสมัคร', model: 'passfail', roles: ['admin', 'expert'] },
+  { key: 'screening', label: 'พิจารณาคุณสมบัติ', model: 'passfail', roles: ['admin', 'expert'] },
+  { key: 'agency_received', label: 'หน่วยงานรับเรื่อง', model: 'coordinate', roles: ['admin', 'agency'] },
+  { key: 'under_review', label: 'อยู่ระหว่างการพิจารณา', model: 'coordinate', roles: ['admin', 'agency'] },
+  { key: 'completed', label: 'เสร็จสิ้น', model: 'finish', roles: ['admin', 'agency'] },
 ]
-const STEP_LABEL: Record<string, string> = {
-  submitted: 'ยื่นสมัคร', screening: 'พิจารณาคุณสมบัติ', in_progress: 'ดำเนินการ', completed: 'เสร็จสิ้น',
+// สถานะที่ถือว่า "ผ่านจุดนี้แล้ว ไปจุดถัดไปได้" ของแต่ละ model
+const ADVANCE_STATE: Record<StepModel, string> = {
+  passfail: 'passed', coordinate: 'in_progress', finish: 'done',
 }
+const STEP_LABEL: Record<string, string> = Object.fromEntries(STEPS.map(s => [s.key, s.label]))
 const STATE_LABEL: Record<string, string> = {
   passed: 'ผ่าน', failed: 'ไม่ผ่าน', pending: 'กลับเป็นรอ',
+  coordinating: 'อยู่ในระหว่างการประสานงาน', in_progress: 'อยู่ระหว่างดำเนินการ',
+  waiting: 'รอรับเรื่องต่อ', done: 'เสร็จสิ้น',
 }
 const ROLE_LABEL: Record<string, string> = {
   agency: 'หน่วยงาน', expert: 'ที่ปรึกษา', admin: 'ผู้ดูแลระบบ',
 }
 
-type StepState = { state: 'pending' | 'passed' | 'failed'; note?: string }
+type StepState = { state: string; note?: string }
 type LogRow = {
   id: string
   step_key: string
@@ -57,12 +67,24 @@ type Group = {
   apps: App[]
 }
 
-const STATE_COLOR = {
+const STATE_COLOR: Record<string, { border: string; bg: string; fg: string }> = {
   pending: { border: '#cbd5e1', bg: '#fff', fg: '#94a3b8' },
   // pending แต่ผ่านหมุดก่อนหน้ามาแล้ว = กดได้ตอนนี้ (active) → เหลือง แทนที่จะเป็นขาวเฉยๆ
   active: { border: '#eab308', bg: '#eab308', fg: '#fff' },
   passed: { border: '#16a34a', bg: '#16a34a', fg: '#fff' },
   failed: { border: '#dc2626', bg: '#dc2626', fg: '#fff' },
+  // จุดที่ 3/4 (coordinate model)
+  coordinating: { border: '#0284c7', bg: '#0284c7', fg: '#fff' }, // ฟ้า: อยู่ในระหว่างการประสานงาน
+  in_progress: { border: '#16a34a', bg: '#16a34a', fg: '#fff' }, // เขียว: อยู่ระหว่างดำเนินการ → ไปจุดถัดไป
+  // จุดที่ 5 (finish model)
+  waiting: { border: '#0284c7', bg: '#0284c7', fg: '#fff' }, // ฟ้า: รอรับเรื่องต่อ
+  done: { border: '#16a34a', bg: '#16a34a', fg: '#fff' }, // เขียว: เสร็จสิ้น
+}
+// ไอคอนกลางหมุดตามสถานะ (ไม่กำหนด = แสดงเลขลำดับจุดแทน)
+const STATE_ICON: Record<string, string> = {
+  passed: '✓', done: '✓', in_progress: '✓',
+  failed: '✕',
+  coordinating: '●', waiting: '●',
 }
 
 export default function AgencyApplicants({
@@ -89,45 +111,23 @@ export default function AgencyApplicants({
 
   const holidaySet = buildHolidaySet(holidays)
 
+  // ใช้แค่แสดงผลชั่วคราวระหว่างรอ router.refresh() — ค่าจริงคำนวณโดย RPC ในฐานข้อมูล
   function overallStatus(steps: Record<string, StepState>): string {
     if (Object.values(steps).some(s => s.state === 'failed')) return 'rejected'
-    if (steps.completed?.state === 'passed') return 'completed'
+    if (steps.completed?.state === 'done') return 'completed'
     return 'in_progress'
   }
 
-  async function setStep(app: App, stepKey: string, state: StepState['state'], note: string | null) {
+  // กำหนดสถานะของจุดใดจุดหนึ่ง — ผ่าน RPC เดียวเสมอ (ตรวจสิทธิ์ตาม role ระดับฐานข้อมูล)
+  async function setStep(app: App, stepKey: string, state: string, note: string | null) {
     setBusy(app.id); setMsg('')
-    const newSteps = { ...app.steps, [stepKey]: { state, ...(note ? { note } : {}) } }
-
-    const updatePayload: any = {
-      steps: newSteps,
-      status: overallStatus(newSteps),
-      updated_at: new Date().toISOString(),
-    }
-
-    // ถ้ากด "ผ่าน" ให้บันทึกเวลาเริ่มของขั้นถัดไป (สำหรับเริ่มนับ SLA ของขั้นถัดไป)
-    if (state === 'passed') {
-      const idx = STEPS.findIndex(s => s.key === stepKey)
-      const nextStep = STEPS[idx + 1]
-      const now = new Date().toISOString()
-      if (nextStep?.key === 'screening') updatePayload.step2_started_at = now
-      else if (nextStep?.key === 'in_progress') updatePayload.step3_started_at = now
-    }
-
-    const { error } = await supabase
-      .from('package_applications')
-      .update(updatePayload)
-      .eq('id', app.id)
-    if (error) { setBusy(null); setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
-    await supabase.from('application_logs').insert({
-      application_id: app.id,
-      step_key: stepKey,
-      new_state: state,
-      note: note,
-      changed_by: currentUser.id,
-      changed_by_name: currentUser.name,
-      changed_by_role: currentUser.role,
+    const { error } = await supabase.rpc('set_application_step_status', {
+      p_app_id: app.id,
+      p_step_key: stepKey,
+      p_state: state,
+      p_note: note,
     })
+    if (error) { setBusy(null); setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
     setBusy(null)
     setEditing(null); setFailNote('')
     router.refresh()
@@ -135,8 +135,14 @@ export default function AgencyApplicants({
 
   function isStepOpen(steps: Record<string, StepState>, idx: number): boolean {
     if (idx === 0) return true
-    const prevKey = STEPS[idx - 1].key
-    return steps[prevKey]?.state === 'passed'
+    const prevStep = STEPS[idx - 1]
+    return steps[prevStep.key]?.state === ADVANCE_STATE[prevStep.model]
+  }
+
+  // ตรวจว่า role ปัจจุบันมีสิทธิ์แก้ไขจุดนี้หรือไม่ (เสริมจาก DB-level ที่บังคับจริงใน RPC)
+  function canEditStep(stepKey: string): boolean {
+    const step = STEPS.find(s => s.key === stepKey)
+    return !!step && step.roles.includes(currentUser.role)
   }
 
   // นับจำนวนผู้สมัครต่อบริการ (นับเป็นใบสมัคร ไม่ใช่รายบุคคล — ใช้สำหรับ chip กรอง)
@@ -209,7 +215,7 @@ export default function AgencyApplicants({
         </h2>
       </div>
       <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4, marginBottom: 12 }}>
-        คลิกที่หมุดเพื่อกำหนดสถานะ (ผ่าน / ไม่ผ่าน) — ต้องผ่านหมุดก่อนหน้าจึงจะทำหมุดถัดไปได้
+        คลิกที่หมุดเพื่อกำหนดสถานะ — ต้องผ่านหมุดก่อนหน้าจึงจะทำหมุดถัดไปได้ (แต่ละบทบาทกำหนดได้เฉพาะบางจุดเท่านั้น)
       </p>
 
       {/* แถบ chip กรองตามบริการ */}
@@ -263,11 +269,12 @@ export default function AgencyApplicants({
                       {STEPS.map((step, i) => {
                         const st = steps[step.key]?.state ?? 'pending'
                         const open = isStepOpen(steps, i)
-                        const clickable = open && busy !== a.id
+                        const editable = canEditStep(step.key)
+                        const clickable = open && editable && busy !== a.id
                         // หมุดที่ยังไม่กำหนดสถานะ (pending) แต่ผ่านหมุดก่อนหน้ามาแล้ว = กดได้ตอนนี้ → แสดงสีเหลือง (active)
                         // ไม่ใช้สีขาวเฉยๆ เพราะจุดนี้เป็นจุดที่ต้องกดกำหนดสถานะต่อไป
                         const colorKey = st === 'pending' && open ? 'active' : st
-                        const c = STATE_COLOR[colorKey]
+                        const c = STATE_COLOR[colorKey] ?? STATE_COLOR.pending
 
                         // คำนวณสถานะ SLA ของ "เส้นที่นำไปสู่หมุดนี้" (ช่วงเวลานับตั้งแต่หมุดก่อนหน้า i-1 ผ่าน จนถึงตอนนี้)
                         // เส้นนี้แสดง SLA เมื่อหมุดปลายทาง (i) เอง ยังไม่ passed แต่เปิดให้กดได้แล้ว (คือกำลังอยู่ในช่วงเวลานี้)
@@ -309,7 +316,7 @@ export default function AgencyApplicants({
                                 : (stepDeadline ? `กำหนด ${formatShortThaiDate(stepDeadline.toISOString())}` : '')}
                             </div>
                             {i > 0 && (
-                              st === 'passed' ? (
+                              st === ADVANCE_STATE[step.model] ? (
                                 // หมุดปลายทาง (หมุดนี้เอง) ผ่านแล้ว — เส้นนำไปสู่หมุดนี้จบสมบูรณ์ → เขียวทึบนิ่ง
                                 <div style={{ position: 'absolute', top: 33, left: '-50%', width: '100%', height: 3,
                                   background: '#16a34a' }} />
@@ -325,7 +332,12 @@ export default function AgencyApplicants({
                             <button
                               disabled={!clickable}
                               onClick={() => { setEditing({ appId: a.id, stepKey: step.key }); setFailNote(steps[step.key]?.note ?? ''); setMsg('') }}
-                              title={clickable ? `กำหนดสถานะ: ${step.label}` : 'ต้องผ่านหมุดก่อนหน้าก่อน'}
+                              title={
+                                clickable ? `กำหนดสถานะ: ${step.label}`
+                                : !open ? 'ต้องผ่านหมุดก่อนหน้าก่อน'
+                                : !editable ? 'บทบาทของท่านไม่มีสิทธิ์กำหนดสถานะจุดนี้'
+                                : undefined
+                              }
                               style={{
                                 position: 'relative', zIndex: 1,
                                 width: 32, height: 32, borderRadius: '50%',
@@ -335,15 +347,19 @@ export default function AgencyApplicants({
                                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                                 opacity: open ? 1 : 0.55,
                               }}>
-                              {st === 'passed' ? '✓' : st === 'failed' ? '✕' : i + 1}
+                              {STATE_ICON[st] ?? (i + 1)}
                             </button>
                             <div style={{ fontSize: 12, marginTop: 6,
-                              color: st === 'passed' ? '#16a34a' : st === 'failed' ? '#dc2626' : (open ? '#ca8a04' : '#94a3b8'),
+                              color: (st === 'passed' || st === 'done' || st === 'in_progress') ? '#16a34a'
+                                : st === 'failed' ? '#dc2626'
+                                : (st === 'coordinating' || st === 'waiting') ? '#0284c7'
+                                : (open ? '#ca8a04' : '#94a3b8'),
                               fontWeight: st !== 'pending' ? 600 : (open ? 600 : 400) }}>
                               {step.label}
                             </div>
-                            {st === 'failed' && steps[step.key]?.note && (
-                              <div style={{ fontSize: 11, color: '#dc2626', marginTop: 2, maxWidth: 130, margin: '2px auto 0' }}>
+                            {steps[step.key]?.note && (
+                              <div style={{ fontSize: 11, color: st === 'failed' ? '#dc2626' : '#475569',
+                                marginTop: 2, maxWidth: 130, margin: '2px auto 0' }}>
                                 {steps[step.key]?.note}
                               </div>
                             )}
@@ -353,37 +369,90 @@ export default function AgencyApplicants({
                     </div>
 
                     {/* เมนูจัดการหมุด */}
-                    {editing?.appId === a.id && (
+                    {editing?.appId === a.id && (() => {
+                      const editStep = STEPS.find(s => s.key === editing.stepKey)!
+                      return (
                       <div style={{ marginTop: 16, background: '#f8fafc', border: '1px solid #e2e8f0',
                         borderRadius: 8, padding: 12 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
-                          กำหนดสถานะ: {STEPS.find(s => s.key === editing.stepKey)?.label}
+                          กำหนดสถานะ: {editStep.label}
                         </div>
-                        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                          <button className="btn btn-sm" disabled={busy === a.id}
-                            onClick={() => setStep(a, editing.stepKey, 'passed', null)}>
-                            🟢 ผ่าน
-                          </button>
-                          <button className="btn btn-sm btn-ghost" disabled={busy === a.id}
-                            onClick={() => setStep(a, editing.stepKey, 'pending', null)}>⚪ กลับเป็นรอ
-                          </button>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          <textarea rows={2} placeholder="เหตุผลที่ไม่ผ่าน (SME จะเห็น)"
-                            value={failNote} onChange={e => setFailNote(e.target.value)}
-                            style={{ width: '100%', fontSize: 13, padding: 6, borderRadius: 6, border: '1px solid #cbd5e1' }} />
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button className="btn btn-sm" disabled={busy === a.id || !failNote.trim()}
-                              onClick={() => setStep(a, editing.stepKey, 'failed', failNote.trim())}
-                              style={{ background: '#dc2626' }}>
-                              🔴 ไม่ผ่าน
+
+                        {editStep.model === 'passfail' && (
+                          <>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                              <button className="btn btn-sm" disabled={busy === a.id}
+                                onClick={() => setStep(a, editing.stepKey, 'passed', null)}>
+                                🟢 ผ่าน
+                              </button>
+                              <button className="btn btn-sm btn-ghost" disabled={busy === a.id}
+                                onClick={() => setStep(a, editing.stepKey, 'pending', null)}>⚪ กลับเป็นรอ
+                              </button>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              <textarea rows={2} placeholder="เหตุผลที่ไม่ผ่าน (SME จะเห็น)"
+                                value={failNote} onChange={e => setFailNote(e.target.value)}
+                                style={{ width: '100%', fontSize: 13, padding: 6, borderRadius: 6, border: '1px solid #cbd5e1' }} />
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                <button className="btn btn-sm" disabled={busy === a.id || !failNote.trim()}
+                                  onClick={() => setStep(a, editing.stepKey, 'failed', failNote.trim())}
+                                  style={{ background: '#dc2626' }}>
+                                  🔴 ไม่ผ่าน
+                                </button>
+                                <button className="btn btn-sm btn-ghost"
+                                  onClick={() => { setEditing(null); setFailNote('') }}>ปิด</button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+
+                        {editStep.model === 'coordinate' && (
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <button className="btn btn-sm" disabled={busy === a.id}
+                              style={{ background: '#0284c7' }}
+                              onClick={() => setStep(a, editing.stepKey, 'coordinating', null)}>
+                              🔵 อยู่ในระหว่างการประสานงาน
+                            </button>
+                            <button className="btn btn-sm" disabled={busy === a.id}
+                              onClick={() => setStep(a, editing.stepKey, 'in_progress', null)}>
+                              🟢 อยู่ระหว่างดำเนินการ (ไปจุดถัดไป)
+                            </button>
+                            <button className="btn btn-sm btn-ghost" disabled={busy === a.id}
+                              onClick={() => setStep(a, editing.stepKey, 'pending', null)}>⚪ กลับเป็นรอ
                             </button>
                             <button className="btn btn-sm btn-ghost"
                               onClick={() => { setEditing(null); setFailNote('') }}>ปิด</button>
                           </div>
-                        </div>
+                        )}
+
+                        {editStep.model === 'finish' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button className="btn btn-sm" disabled={busy === a.id}
+                                style={{ background: '#0284c7' }}
+                                onClick={() => setStep(a, editing.stepKey, 'waiting', null)}>
+                                🔵 รอรับเรื่องต่อ
+                              </button>
+                              <button className="btn btn-sm btn-ghost" disabled={busy === a.id}
+                                onClick={() => setStep(a, editing.stepKey, 'pending', null)}>⚪ กลับเป็นรอ
+                              </button>
+                            </div>
+                            <textarea rows={2} placeholder="เหตุผล/รายละเอียดตอนปิดจบ (จำเป็นต้องกรอก)"
+                              value={failNote} onChange={e => setFailNote(e.target.value)}
+                              style={{ width: '100%', fontSize: 13, padding: 6, borderRadius: 6, border: '1px solid #cbd5e1' }} />
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button className="btn btn-sm" disabled={busy === a.id || !failNote.trim()}
+                                onClick={() => setStep(a, editing.stepKey, 'done', failNote.trim())}>
+                                🟢 เสร็จสิ้น
+                              </button>
+                              <button className="btn btn-sm btn-ghost"
+                                onClick={() => { setEditing(null); setFailNote('') }}>ปิด</button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
+                      )
+                    })()}
 
                     {/* ประวัติการแก้ไข */}
                     {logs.length > 0 && (
