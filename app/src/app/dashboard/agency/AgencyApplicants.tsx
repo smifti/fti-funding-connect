@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import {
-  buildHolidaySet, getSlaStatus, getStep3SlaDays, getSlaColor, formatDaysRemaining,
+  buildHolidaySet, getSlaStatus, getStep3SlaDays, getStep4SlaDays, getSlaColor, formatDaysRemaining,
   SlaConfig,
 } from '@/lib/sla'
 
@@ -56,6 +56,7 @@ type App = {
   step1_started_at: string | null
   step2_started_at: string | null
   step3_started_at: string | null
+  step4_started_at: string | null
 }
 
 // กลุ่มของผู้รับบริการ 1 ราย (จัดกลุ่มด้วย owner_id) ที่อาจมีหลายใบสมัคร/บริการ
@@ -285,7 +286,7 @@ export default function AgencyApplicants({
                         let stepDeadline: Date | null = null
                         if (i > 0) {
                           const prevKey = STEPS[i - 1].key
-                          lineIsActive = st !== 'passed' && open
+                          lineIsActive = st !== ADVANCE_STATE[step.model] && open
 
                           let startedAtStr: string | null = null
                           let slaDays = 0
@@ -295,9 +296,12 @@ export default function AgencyApplicants({
                           } else if (prevKey === 'screening') {
                             startedAtStr = a.step2_started_at
                             slaDays = slaConfig.step2_days
-                          } else if (prevKey === 'in_progress') {
+                          } else if (prevKey === 'agency_received') {
                             startedAtStr = a.step3_started_at
                             slaDays = getStep3SlaDays(slaConfig, a.packages?.max_amount ?? null)
+                          } else if (prevKey === 'under_review') {
+                            startedAtStr = a.step4_started_at
+                            slaDays = getStep4SlaDays(slaConfig, a.packages?.max_amount ?? null)
                           }
 
                           if (startedAtStr && open) {
