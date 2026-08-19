@@ -172,22 +172,79 @@ function AgencyProfileForm({
 
   // ยังไม่ได้จัดกลุ่มเข้าหน่วยงาน
   if (agency === null) {
-    return (
-      <div className="card" style={{ maxWidth: 640 }}>
-        <h2>ข้อมูลหน่วยงาน</h2>
-        <div style={{
-          background: '#fef9c3', color: '#a16207', padding: '12px 16px',
-          borderRadius: 10, fontSize: 14, lineHeight: 1.6,
-        }}>
-          บัญชีของท่านยังไม่ได้จัดกลุ่มเข้าหน่วยงาน กรุณาติดต่อผู้ดูแลระบบ
-        </div>
-      </div>
-    )
+    return <NotGroupedPanel supabase={supabase} />
   }
 
   return <AgencyProfileFormReady agency={agency} onSaved={onSaved} supabase={supabase} />
 }
+function NotGroupedPanel({ supabase }: { supabase: ReturnType<typeof createClient> }) {
+  const [agencies, setAgencies] = useState<{ id: string; name: string }[]>([])
+  const [selectedId, setSelectedId] = useState('')
+  const [requested, setRequested] = useState<{ id: string | null; name: string | null } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
 
+  useEffect(() => {
+    supabase.rpc('list_agencies_for_signup').then(({ data }: any) => setAgencies(data ?? []))
+    supabase.rpc('get_my_join_request').then(({ data }: any) => {
+      if (data && data.length > 0 && data[0].requested_agency_id) {
+        setRequested({ id: data[0].requested_agency_id, name: data[0].requested_agency_name })
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function submit() {
+    if (!selectedId) { setMsg('กรุณาเลือกหน่วยงาน'); return }
+    setBusy(true); setMsg('')
+    const { error } = await supabase.rpc('agency_request_join', { p_agency_id: selectedId })
+    setBusy(false)
+    if (error) { setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
+    const found = agencies.find(a => a.id === selectedId)
+    setRequested({ id: selectedId, name: found?.name ?? null })
+  }
+
+  return (
+    <div className="card" style={{ maxWidth: 640 }}>
+      <h2>ข้อมูลหน่วยงาน</h2>
+      <div style={{
+        background: '#fef9c3', color: '#a16207', padding: '12px 16px',
+        borderRadius: 10, fontSize: 14, lineHeight: 1.6, marginBottom: 16,
+      }}>
+        บัญชีของท่านยังไม่ได้จัดกลุ่มเข้าหน่วยงาน
+      </div>
+
+      {requested?.id ? (
+        <div style={{ background: '#dbeafe', color: '#1e40af', padding: '12px 16px', borderRadius: 10, fontSize: 14 }}>
+          ✓ ส่งคำขอเข้าร่วม <strong>{requested.name}</strong> แล้ว — รอผู้ดูแลระบบอนุมัติ
+        </div>
+      ) : (
+        <>
+          <p style={{ fontSize: 14, color: '#475569', marginBottom: 12 }}>
+            เลือกหน่วยงานที่ท่านสังกัด แล้วส่งคำขอให้ผู้ดูแลระบบอนุมัติเข้าร่วม
+          </p>
+          {msg && <div className="alert alert-err" style={{ marginBottom: 10 }}>{msg}</div>}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <select value={selectedId} onChange={e => setSelectedId(e.target.value)}
+              style={{ flex: 1, minWidth: 200, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--line)' }}>
+              <option value="">— เลือกหน่วยงาน —</option>
+              {agencies.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+            <button className="btn btn-sm" disabled={busy} onClick={submit}>
+              {busy ? 'กำลังส่ง…' : 'ส่งคำขอเข้าร่วม'}
+            </button>
+          </div>
+          {agencies.length === 0 && (
+            <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>
+              ยังไม่มีหน่วยงานในระบบให้เลือก — กรุณาติดต่อผู้ดูแลระบบเพื่อสร้างหน่วยงานใหม่
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+ 
 function AgencyProfileFormReady({
   agency, onSaved, supabase,
 }: {
