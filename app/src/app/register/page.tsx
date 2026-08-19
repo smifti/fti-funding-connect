@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 
@@ -32,6 +32,16 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const set = (k: string) => (e: any) => setForm({ ...form, [k]: e.target.value })
 
+  // สำหรับ role = agency: เลือกเข้าร่วมหน่วยงานที่มีอยู่แล้ว หรือสร้างใหม่
+  const [agencyMode, setAgencyMode] = useState<'join' | 'new'>('join')
+  const [agencies, setAgencies] = useState<{ id: string; name: string; logo: string | null }[]>([])
+  const [selectedAgencyId, setSelectedAgencyId] = useState('')
+
+  useEffect(() => {
+    supabase.rpc('list_agencies_for_signup').then(({ data }) => setAgencies(data ?? []))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const roleDesc = roleType === 'sme' ? 'ยื่นคำขอรับการสนับสนุน'
     : roleType === 'agency' ? 'สถาบันการเงิน, หน่วยงานภาครัฐ, หน่วยร่วมดำเนินการ ฯลฯ (รอ ส.อ.ท. อนุมัติ)'
     : 'คัดกรองคำขอ (รอ ส.อ.ท. อนุมัติ)'
@@ -59,8 +69,15 @@ export default function RegisterPage() {
       setErr('กรุณากรอกเบอร์โทรศัพท์')
       return
     }
+    // บังคับเลือกหน่วยงาน ถ้าเลือกโหมด "เข้าร่วมหน่วยงานที่มีอยู่แล้ว"
+    if (roleType === 'agency' && agencyMode === 'join' && !selectedAgencyId) {
+      setErr('กรุณาเลือกหน่วยงานที่ท่านสังกัด')
+      return
+    }
     setLoading(true)
-    const companyName = roleType === 'sme' ? form.companyName : form.orgName
+    const companyName = roleType === 'sme'
+      ? form.companyName
+      : (roleType === 'agency' && agencyMode === 'join' ? '' : form.orgName)
 
     // เช็กเลขนิติบุคคลซ้ำก่อน (เฉพาะ SME ที่กรอกเลข)
     if (roleType === 'sme' && form.taxId.trim() !== '') {
@@ -90,6 +107,7 @@ export default function RegisterPage() {
           coordinator_name: form.coordName,
           coordinator_phone: form.coordPhone,
           coordinator_email: form.coordEmail,
+          requested_agency_id: (roleType === 'agency' && agencyMode === 'join' && selectedAgencyId) ? selectedAgencyId : null,
         },
       },
     })
@@ -178,10 +196,50 @@ export default function RegisterPage() {
 
         {roleType === 'agency' && (
           <>
-            <div className="field">
-              <label>ชื่อหน่วยงาน / ผู้ให้บริการ</label>
-              <input value={form.orgName} onChange={set('orgName')} placeholder="เช่น ธนาคารกรุงไทย" />
+            <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 4, borderRadius: 10, marginBottom: 10 }}>
+              <button type="button" onClick={() => setAgencyMode('join')}
+                style={{
+                  flex: 1, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '8px 6px', fontSize: 13,
+                  fontWeight: agencyMode === 'join' ? 600 : 400,
+                  background: agencyMode === 'join' ? '#1e3a8a' : 'transparent',
+                  color: agencyMode === 'join' ? '#fff' : '#475569',
+                }}>
+                เข้าร่วมหน่วยงานที่มีอยู่แล้ว
+              </button>
+              <button type="button" onClick={() => setAgencyMode('new')}
+                style={{
+                  flex: 1, border: 'none', cursor: 'pointer', borderRadius: 8, padding: '8px 6px', fontSize: 13,
+                  fontWeight: agencyMode === 'new' ? 600 : 400,
+                  background: agencyMode === 'new' ? '#1e3a8a' : 'transparent',
+                  color: agencyMode === 'new' ? '#fff' : '#475569',
+                }}>
+                สร้างหน่วยงานใหม่
+              </button>
             </div>
+
+            {agencyMode === 'join' ? (
+              <div className="field">
+                <label>เลือกหน่วยงานที่ท่านสังกัด</label>
+                <select value={selectedAgencyId} onChange={e => setSelectedAgencyId(e.target.value)}>
+                  <option value="">— เลือกหน่วยงาน —</option>
+                  {agencies.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+                {agencies.length === 0 && (
+                  <p style={{ fontSize: 12, color: '#94a3b8', margin: '6px 0 0' }}>
+                    ยังไม่มีหน่วยงานในระบบให้เลือก — กรุณาเลือก "สร้างหน่วยงานใหม่" แทน
+                  </p>
+                )}
+                <p style={{ fontSize: 12, color: '#94a3b8', margin: '6px 0 0' }}>
+                  หน่วยงานท่านยังไม่มีในรายการ? เลือก "สร้างหน่วยงานใหม่" ด้านบนแทนได้
+                </p>
+              </div>
+            ) : (
+              <div className="field">
+                <label>ชื่อหน่วยงาน / ผู้ให้บริการ</label>
+                <input value={form.orgName} onChange={set('orgName')} placeholder="เช่น ธนาคารกรุงไทย" />
+              </div>
+            )}
+
             <div className="field">
               <label>ชื่อ-นามสกุล ผู้ประสานงาน</label>
               <input value={form.coordName} onChange={set('coordName')} />
