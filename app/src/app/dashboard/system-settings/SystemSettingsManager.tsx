@@ -9,6 +9,8 @@ type SlaConfigRow = {
   step2_days: number
   step3_days_low: number
   step3_days_high: number
+  step4_days_low: number
+  step4_days_high: number
   step3_threshold_amount: number
 } | null
 
@@ -38,8 +40,10 @@ export default function SystemSettingsManager({
   const [slaForm, setSlaForm] = useState({
     step1_days: String(initialSlaConfig?.step1_days ?? 5),
     step2_days: String(initialSlaConfig?.step2_days ?? 5),
-    step3_days_low: String(initialSlaConfig?.step3_days_low ?? 20),
-    step3_days_high: String(initialSlaConfig?.step3_days_high ?? 30),
+    step3_days_low: String(initialSlaConfig?.step3_days_low ?? 10),
+    step3_days_high: String(initialSlaConfig?.step3_days_high ?? 10),
+    step4_days_low: String(initialSlaConfig?.step4_days_low ?? 30),
+    step4_days_high: String(initialSlaConfig?.step4_days_high ?? 30),
     step3_threshold_amount: String(initialSlaConfig?.step3_threshold_amount ?? 15000000),
   })
   const [slaBusy, setSlaBusy] = useState(false)
@@ -63,6 +67,8 @@ export default function SystemSettingsManager({
       step2_days: Number(slaForm.step2_days),
       step3_days_low: Number(slaForm.step3_days_low),
       step3_days_high: Number(slaForm.step3_days_high),
+      step4_days_low: Number(slaForm.step4_days_low),
+      step4_days_high: Number(slaForm.step4_days_high),
       step3_threshold_amount: Number(slaForm.step3_threshold_amount),
     }
     for (const [key, val] of Object.entries(values)) {
@@ -166,7 +172,7 @@ export default function SystemSettingsManager({
 
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8 }}>
-              ② พิจารณาคุณสมบัติ → ดำเนินการ (จากหน่วยร่วม)
+              ② พิจารณาคุณสมบัติ → หน่วยงานรับเรื่อง
             </div>
             <div style={{ maxWidth: 200 }}>
               <label style={labelStyle}>จำนวนวันทำการ</label>
@@ -177,7 +183,7 @@ export default function SystemSettingsManager({
 
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8 }}>
-              ③ ดำเนินการ → เสร็จสิ้น (แบ่งตามวงเงิน)
+              ③ หน่วยงานรับเรื่อง → อยู่ระหว่างการพิจารณา (แบ่งตามวงเงิน)
             </div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ flex: '1 1 180px' }}>
@@ -199,6 +205,28 @@ export default function SystemSettingsManager({
             <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6 }}>
               เช่น วงเงินต่ำกว่า {Number(slaForm.step3_threshold_amount || 0).toLocaleString('th-TH')} บาท ใช้ {slaForm.step3_days_low || 0} วัน,
               {' '}ตั้งแต่ {Number(slaForm.step3_threshold_amount || 0).toLocaleString('th-TH')} บาทขึ้นไป ใช้ {slaForm.step3_days_high || 0} วัน
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8 }}>
+              ④ อยู่ระหว่างการพิจารณา → เสร็จสิ้น (แบ่งตามวงเงิน — ใช้เกณฑ์วงเงินเดียวกับข้อ ③)
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 180px' }}>
+                <label style={labelStyle}>จำนวนวันทำการ (วงเงินต่ำกว่าเกณฑ์)</label>
+                <input style={fieldStyle} type="number" min={0} value={slaForm.step4_days_low}
+                  onChange={e => setSlaField('step4_days_low', e.target.value)} />
+              </div>
+              <div style={{ flex: '1 1 180px' }}>
+                <label style={labelStyle}>จำนวนวันทำการ (วงเงินตั้งแต่เกณฑ์ขึ้นไป)</label>
+                <input style={fieldStyle} type="number" min={0} value={slaForm.step4_days_high}
+                  onChange={e => setSlaField('step4_days_high', e.target.value)} />
+              </div>
+            </div>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6 }}>
+              เช่น วงเงินต่ำกว่า {Number(slaForm.step3_threshold_amount || 0).toLocaleString('th-TH')} บาท ใช้ {slaForm.step4_days_low || 0} วัน,
+              {' '}ตั้งแต่ {Number(slaForm.step3_threshold_amount || 0).toLocaleString('th-TH')} บาทขึ้นไป ใช้ {slaForm.step4_days_high || 0} วัน
             </div>
           </div>
 
