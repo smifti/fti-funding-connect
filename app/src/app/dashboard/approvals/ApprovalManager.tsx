@@ -31,6 +31,8 @@ type User = {
   created_at: string | null
   approval_confirmation_token: string | null
   approval_confirmed_at: string | null
+  requested_agency_id: string | null
+  requested_agency_name: string | null
 }
 
 export default function ApprovalManager({ initialUsers }: { initialUsers: User[] }) {
@@ -112,13 +114,7 @@ export default function ApprovalManager({ initialUsers }: { initialUsers: User[]
         <td>{u.full_name || '—'}
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>{u.email}</div>
         </td>
-        <td>{u.agency_name || '—'}
-          {u.role === 'agency' && u.agency_categories && u.agency_categories.length > 0 && (
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-              {u.agency_categories.map(c => CATEGORY_LABELS[c] ?? c).join(', ')}
-            </div>
-          )}
-        </td>
+         <td>{u.agency_name || '—'}
         <td>
           {isPending ? (
             <span style={{ background: '#fef9c3', color: '#a16207', fontSize: 12,
