@@ -36,7 +36,7 @@ type UnassignedUser = {
 
 type Member = { id: string; email: string; full_name: string | null; role: string; approval_status: string | null }
 
-type CreateFormState = {
+type AgencyFormState = {
   name: string
   logo: string
   description: string
@@ -46,7 +46,7 @@ type CreateFormState = {
   contact_phone: string
 }
 
-const emptyForm: CreateFormState = {
+const emptyForm: AgencyFormState = {
   name: '', logo: '', description: '', website: '', email: '', contact_name: '', contact_phone: '',
 }
 
@@ -64,7 +64,12 @@ export default function AgencyGroupManager({
   const [expanded, setExpanded] = useState<string | null>(null)
   const [membersCache, setMembersCache] = useState<Record<string, Member[]>>({})
   const [createModalUser, setCreateModalUser] = useState<UnassignedUser | null>(null)
-  const [form, setForm] = useState<CreateFormState>(emptyForm)
+  const [form, setForm] = useState<AgencyFormState>(emptyForm)
+
+  // สำหรับ admin แก้ไขข้อมูลหน่วยงานที่มีอยู่แล้ว
+  const [editModalAgency, setEditModalAgency] = useState<Agency | null>(null)
+  const [editForm, setEditForm] = useState<AgencyFormState>(emptyForm)
+  const [editBusy, setEditBusy] = useState(false)
 
   async function assignToAgency(userId: string) {
     const agencyId = selectedAgencyFor[userId]
@@ -146,6 +151,43 @@ export default function AgencyGroupManager({
     router.refresh()
   }
 
+  // เปิด modal แก้ไขข้อมูลหน่วยงานที่มีอยู่แล้ว (สำหรับ admin ช่วยแก้ไขแทน)
+  function openEditModal(a: Agency) {
+    setEditForm({
+      name: a.name ?? '',
+      logo: a.logo ?? '',
+      description: a.description ?? '',
+      website: a.website ?? '',
+      email: a.email ?? '',
+      contact_name: a.contact_name ?? '',
+      contact_phone: a.contact_phone ?? '',
+    })
+    setEditModalAgency(a)
+  }
+
+  async function submitEditAgency() {
+    if (!editModalAgency) return
+    if (!editForm.name.trim()) { setMsg('กรุณากรอกชื่อหน่วยงาน'); return }
+    setEditBusy(true); setMsg('')
+
+    const { error } = await supabase.rpc('admin_update_agency', {
+      p_agency_id: editModalAgency.id,
+      p_name: editForm.name.trim(),
+      p_logo: editForm.logo.trim() || null,
+      p_description: editForm.description.trim() || null,
+      p_website: editForm.website.trim() || null,
+      p_email: editForm.email.trim() || null,
+      p_contact_name: editForm.contact_name.trim() || null,
+      p_contact_phone: editForm.contact_phone.trim() || null,
+    })
+    setEditBusy(false)
+    if (error) { setMsg('แก้ไขไม่สำเร็จ: ' + error.message); return }
+
+    setMsg(`แก้ไขข้อมูล "${editForm.name.trim()}" เรียบร้อยแล้ว`)
+    setEditModalAgency(null)
+    router.refresh()
+  }
+
   return (
     <div>
       {msg && <div className="alert alert-ok" style={{ marginBottom: 12 }}>{msg}</div>}
@@ -159,7 +201,7 @@ export default function AgencyGroupManager({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {initialAgencies.map(a => (
               <div key={a.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     {a.logo && (
                       <img src={a.logo} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'contain', border: '1px solid #e2e8f0' }} />
@@ -173,9 +215,14 @@ export default function AgencyGroupManager({
                       </div>
                     </div>
                   </div>
-                  <button className="btn btn-ghost btn-sm" onClick={() => toggleExpand(a.id)}>
-                    {expanded === a.id ? 'ซ่อนสมาชิก' : 'ดูสมาชิก'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => openEditModal(a)}>
+                      ✏️ แก้ไข
+                    </button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => toggleExpand(a.id)}>
+                      {expanded === a.id ? 'ซ่อนสมาชิก' : 'ดูสมาชิก'}
+                    </button>
+                  </div>
                 </div>
 
                 {expanded === a.id && (
@@ -331,6 +378,71 @@ export default function AgencyGroupManager({
               <button className="btn btn-ghost btn-sm" onClick={() => setCreateModalUser(null)}>ยกเลิก</button>
               <button className="btn btn-sm" disabled={working === createModalUser.id} onClick={submitCreateAgency}>
                 {working === createModalUser.id ? 'กำลังสร้าง…' : 'สร้างและเพิ่มสมาชิก'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal แก้ไขข้อมูลหน่วยงานที่มีอยู่แล้ว (admin ช่วยแก้ไขแทน) */}
+      {editModalAgency && (
+        <div
+          onClick={() => setEditModalAgency(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 100, padding: 16,
+          }}>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#fff', borderRadius: 14, width: '100%', maxWidth: 480,
+              maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            }}>
+            <div style={{ padding: '18px 20px 0 20px', display: 'flex', justifyContent: 'space-between' }}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>แก้ไขข้อมูลหน่วยงาน</h2>
+              <button onClick={() => setEditModalAgency(null)} aria-label="ปิด" style={{
+                border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: '#94a3b8',
+              }}>×</button>
+            </div>
+            <p style={{ padding: '4px 20px 0', fontSize: 12, color: '#94a3b8' }}>
+              การแก้ไขนี้จะมีผลกับทุกบัญชีในหน่วยงานเดียวกัน และจะถูกบันทึกในประวัติการแก้ไขว่าแก้โดยผู้ดูแลระบบ
+            </p>
+            <div style={{ padding: 20, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="field" style={{ margin: 0 }}>
+                <label>ชื่อหน่วยงาน *</label>
+                <input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label>โลโก้ (URL รูปภาพ)</label>
+                <input value={editForm.logo} onChange={e => setEditForm(f => ({ ...f, logo: e.target.value }))} />
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label>รายละเอียดบริการ</label>
+                <textarea value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                  style={{ width: '100%', padding: '11px 13px', border: '1px solid var(--line)', borderRadius: 9, minHeight: 70 }} />
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label>ชื่อผู้ติดต่อ</label>
+                <input value={editForm.contact_name} onChange={e => setEditForm(f => ({ ...f, contact_name: e.target.value }))} />
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label>เบอร์โทร</label>
+                <input value={editForm.contact_phone} onChange={e => setEditForm(f => ({ ...f, contact_phone: e.target.value }))} />
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label>อีเมลติดต่อ</label>
+                <input value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label>เว็บไซต์</label>
+                <input value={editForm.website} onChange={e => setEditForm(f => ({ ...f, website: e.target.value }))} />
+              </div>
+            </div>
+            <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setEditModalAgency(null)}>ยกเลิก</button>
+              <button className="btn btn-sm" disabled={editBusy} onClick={submitEditAgency}>
+                {editBusy ? 'กำลังบันทึก…' : 'บันทึกการแก้ไข'}
               </button>
             </div>
           </div>
