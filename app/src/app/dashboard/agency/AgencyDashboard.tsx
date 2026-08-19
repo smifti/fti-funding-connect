@@ -75,7 +75,7 @@ export default async function AgencyDashboard({ userId }: { userId: string }) {
   // ข้อมูลผู้ใช้ปัจจุบัน (ไว้บันทึก log)
   const currentUser = {
     id: userId,
-    name: profile?.agency_name || profile?.full_name || '—',
+    name: profile?.full_name || '—',
     role: 'agency',
   }
 
