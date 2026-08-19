@@ -6,12 +6,16 @@ const CATEGORY_LABELS: Record<string, string> = {
   other: 'อื่น ๆ (ESG)',
 }
 
-// คำนวณสถานะรวมของใบสมัคร จาก steps
+// คำนวณสถานะรวมของใบสมัคร จาก steps (5 checkpoint: submitted, screening,
+// agency_received, under_review, completed)
 function caseStatus(steps: Record<string, any>): 'submitted' | 'screening' | 'in_progress' | 'completed' | 'rejected' {
   const s = steps ?? {}
   if (Object.values(s).some((x: any) => x?.state === 'failed')) return 'rejected'
-  if (s.completed?.state === 'passed') return 'completed'
-  if (s.in_progress?.state === 'passed') return 'in_progress'
+  if (s.completed?.state === 'done') return 'completed'
+  if (s.under_review?.state === 'in_progress') return 'in_progress'
+  if (s.under_review?.state === 'coordinating') return 'in_progress'
+  if (s.agency_received?.state === 'in_progress') return 'in_progress'
+  if (s.agency_received?.state === 'coordinating') return 'in_progress'
   if (s.screening?.state === 'passed') return 'in_progress'
   return 'submitted'
 }
@@ -51,7 +55,7 @@ export default function AgencyOverview({
   const STATUS_TEXT: Record<string, string> = {
     submitted: 'คำขอใหม่ — รอรับเรื่อง',
     screening: 'อยู่ระหว่างพิจารณาคุณสมบัติ',
-    in_progress: 'อยู่ระหว่างดำเนินการ',
+    in_progress: 'หน่วยงานรับเรื่อง / อยู่ระหว่างการพิจารณา',
   }
 
   // Pipeline
@@ -96,7 +100,7 @@ export default function AgencyOverview({
                     <span style={{ fontSize: 13, color: '#64748b' }}> · {a.packages?.title ?? '—'}</span>
                     <div style={{ fontSize: 12, color: '#a16207' }}>{STATUS_TEXT[st] ?? st}</div>
                   </div>
-                  <button className="btn btn-sm" onClick={() => onGoApplicants(p.id, p.title)}>ดูผู้สมัคร</button>
+                  <button className="btn btn-sm" onClick={() => onGoApplicants(a.package_id, a.packages?.title)}>ดูผู้สมัคร</button>
                 </div>
               )
             })}
