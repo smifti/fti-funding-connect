@@ -70,6 +70,9 @@ export default function AgencyTabs({
   // ข้อมูลหน่วยงาน (ชุดเดียวกันทุก user ในหน่วยงาน) — undefined = กำลังโหลด, null = ยังไม่ได้จัดกลุ่ม
   const [agency, setAgency] = useState<Agency | null | undefined>(undefined)
 
+  // อีเมลของ user ที่ login อยู่ตอนนี้ (แสดงคู่กับชื่อ เหนือปุ่มตั้งค่า)
+  const [myEmail, setMyEmail] = useState('')
+
   useEffect(() => {
     let cancelled = false
     async function loadAgency() {
@@ -78,7 +81,13 @@ export default function AgencyTabs({
       if (error || !data || data.length === 0) { setAgency(null); return }
       setAgency(data[0])
     }
+    async function loadEmail() {
+      const { data } = await supabase.auth.getUser()
+      if (cancelled) return
+      setMyEmail(data.user?.email ?? '')
+    }
     loadAgency()
+    loadEmail()
     return () => { cancelled = true }
   }, [])
 
@@ -96,6 +105,13 @@ export default function AgencyTabs({
 
   return (
     <>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ textAlign: 'right', fontSize: 12, color: '#64748b', lineHeight: 1.4 }}>
+          <div style={{ fontWeight: 600, color: '#1e293b' }}>{currentUser.name || '—'}</div>
+          <div>{myEmail}</div>
+        </div>
+      </div>
+
       <h1 className="page-title">{displayName}</h1>
       <p className="page-sub">
         รับผิดชอบด้าน: {cats.map(c => CATEGORY_LABELS[c]).join(' · ') || '—'}
