@@ -114,7 +114,21 @@ export default function ApprovalManager({ initialUsers }: { initialUsers: User[]
         <td>{u.full_name || '—'}
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>{u.email}</div>
         </td>
-         <td>{u.agency_name || '—'}
+        <td>{u.agency_name || '—'}
+          {u.role === 'agency' && u.agency_categories && u.agency_categories.length > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+              {u.agency_categories.map(c => CATEGORY_LABELS[c] ?? c).join(', ')}
+            </div>
+          )}
+          {u.requested_agency_name && (
+            <div style={{ fontSize: 12, color: '#a16207', background: '#fef9c3', display: 'inline-block',
+              padding: '2px 8px', borderRadius: 8, marginTop: 4, fontWeight: 600 }}>
+              ⚠️ ขอเข้าร่วม: {u.requested_agency_name}
+            </div>
+          )}
+        </td>
+        <td>
+          {isPending ? (
             <span style={{ background: '#fef9c3', color: '#a16207', fontSize: 12,
               padding: '3px 10px', borderRadius: 10, fontWeight: 600 }}>รออนุมัติ</span>
           ) : (
