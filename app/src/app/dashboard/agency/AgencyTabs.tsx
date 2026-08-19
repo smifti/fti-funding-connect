@@ -90,7 +90,9 @@ export default function AgencyTabs({
     borderBottom: active ? '2px solid #1e3a8a' : '2px solid transparent',
   })
 
-  const displayName = agency?.name || profile.agency_name || 'หน่วยงานสนับสนุน'
+  // ไม่ fallback ไปใช้ profile.agency_name (ข้อความดิบที่พิมพ์ตอนสมัคร ยังไม่ผ่าน admin อนุมัติ)
+  // เพื่อไม่ให้ดูเหมือนมีหน่วยงานแล้วทั้งที่จริงยังไม่ได้ถูกจัดกลุ่ม
+  const displayName = agency?.name || 'หน่วยงานสนับสนุน'
 
   return (
     <>
