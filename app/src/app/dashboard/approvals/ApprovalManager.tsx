@@ -115,8 +115,6 @@ export default function ApprovalManager({ initialUsers }: { initialUsers: User[]
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>{u.email}</div>
         </td>
          <td>{u.agency_name || '—'}
-        <td>
-          {isPending ? (
             <span style={{ background: '#fef9c3', color: '#a16207', fontSize: 12,
               padding: '3px 10px', borderRadius: 10, fontWeight: 600 }}>รออนุมัติ</span>
           ) : (
