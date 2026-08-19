@@ -42,6 +42,29 @@ export default function ApprovalManager({ initialUsers }: { initialUsers: User[]
   const [msg, setMsg] = useState('')
   const [working, setWorking] = useState<string | null>(null)
   const [detailUser, setDetailUser] = useState<User | null>(null)
+  const [resending, setResending] = useState<string | null>(null)
+
+  async function resendConfirmation(u: User) {
+    setResending(u.id); setMsg('')
+    try {
+      const res = await fetch('/api/send-approval-confirmation-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: u.email,
+          name: u.full_name || u.agency_name || '',
+          token: u.approval_confirmation_token,
+        }),
+      })
+      const data = await res.json()
+      setResending(null)
+      if (!data.ok) { setMsg('ส่งอีเมลไม่สำเร็จ: ' + (data.error ?? '')); return }
+      setMsg(`ส่งอีเมลยืนยันให้ ${u.full_name || u.email} อีกครั้งแล้ว`)
+    } catch (err: any) {
+      setResending(null)
+      setMsg('ส่งอีเมลไม่สำเร็จ: ' + (err?.message ?? ''))
+    }
+  }
 
   async function approve(u: User) {
     const name = u.full_name || u.email
@@ -139,8 +162,15 @@ export default function ApprovalManager({ initialUsers }: { initialUsers: User[]
                 <span style={{ background: '#dcfce7', color: '#166534', fontSize: 12,
                   padding: '3px 10px', borderRadius: 10, fontWeight: 600 }}>ยืนยันอีเมลแล้ว</span>
               ) : (
-                <span style={{ background: '#fef3c7', color: '#b45309', fontSize: 12,
-                  padding: '3px 10px', borderRadius: 10, fontWeight: 600 }}>รอยืนยันอีเมล</span>
+                <>
+                  <span style={{ background: '#fef3c7', color: '#b45309', fontSize: 12,
+                    padding: '3px 10px', borderRadius: 10, fontWeight: 600 }}>รอยืนยันอีเมล</span>
+                  <button className="btn btn-ghost btn-sm" disabled={resending === u.id}
+                    onClick={() => resendConfirmation(u)}
+                    style={{ fontSize: 11, padding: '2px 8px' }}>
+                    {resending === u.id ? 'กำลังส่ง…' : '📧 ส่งอีเมลยืนยันอีกครั้ง'}
+                  </button>
+                </>
               )}
             </div>
           )}
