@@ -21,7 +21,7 @@ export default async function ApplicationsPage() {
     .from('package_applications')
     .select(`
       id, status, steps, created_at,
-      step1_started_at, step2_started_at, step3_started_at,
+      step1_started_at, step2_started_at, step3_started_at, step4_started_at,
       packages(title, category, min_amount, max_amount),
       sme_profiles(owner_id, company_name, province, sme_one_id),
       application_logs(id, step_key, new_state, note, changed_by_name, changed_by_role, created_at)
@@ -31,7 +31,7 @@ export default async function ApplicationsPage() {
   // ค่า SLA และวันหยุดพิเศษ (สำหรับคำนวณกำหนดเวลาในหน้าติดตามกิจกรรม)
   const { data: slaConfigRow } = await supabase
     .from('sla_config')
-    .select('step1_days, step2_days, step3_days_low, step3_days_high, step3_threshold_amount')
+    .select('step1_days, step2_days, step3_days_low, step3_days_high, step4_days_low, step4_days_high, step3_threshold_amount')
     .limit(1)
     .maybeSingle()
 
@@ -40,7 +40,7 @@ export default async function ApplicationsPage() {
     .select('holiday_date')
 
   const slaConfig = slaConfigRow ?? {
-    step1_days: 5, step2_days: 5, step3_days_low: 20, step3_days_high: 30, step3_threshold_amount: 15000000,
+    step1_days: 5, step2_days: 5, step3_days_low: 10, step3_days_high: 10, step4_days_low: 30, step4_days_high: 30, step3_threshold_amount: 15000000,
   }
   const holidays = (holidayRows ?? []).map((h: any) => h.holiday_date as string)
 
