@@ -214,7 +214,7 @@ export default function ApprovalManager({ initialUsers }: { initialUsers: User[]
         ) : (
           <table>
             <thead>
-              <tr><th>ชื่อ / อีเมล</th><th>หน่วยงาน / ด้าน</th><th>สถานะ</th><th>การจัดการ</th></tr>
+              <tr><th>ชื่อ / อีเมล</th><th>หน่วยงาน (เดิม)</th><th>สถานะ</th><th>การจัดการ</th></tr>
             </thead>
             <tbody>{pendingList.map(u => renderRow(u, true))}</tbody>
           </table>
