@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 
 // Modal ขอความยินยอม PDPA ก่อนส่งคำขอไปยังธนาคาร/สถาบันการเงินที่เลือก
 // อิงเนื้อหาจากเอกสาร "ความยินยอมในการเก็บรวบรวม ใช้ และเปิดเผยข้อมูลส่วนบุคคล — ระบบ FTI SME Funding Connect"
@@ -72,7 +73,12 @@ export default function PdpaConsentModal({
               การกด &quot;ยอมรับและดำเนินการต่อ&quot; ด้านล่าง หมายถึง:
             </p>
             <ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>
-              <li>ข้าพเจ้าได้อ่านและรับทราบประกาศความเป็นส่วนตัว (Privacy Notice) ของระบบนี้แล้ว</li>
+              <li>
+                ข้าพเจ้าได้อ่านและรับทราบ{' '}
+                <Link href="/privacy-notice" target="_blank" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                  ประกาศความเป็นส่วนตัว (Privacy Notice) ของระบบนี้
+                </Link>{' '}แล้ว
+              </li>
               <li>
                 ข้าพเจ้ายินยอมให้ ส.อ.ท. เปิดเผยหรือส่งต่อข้อมูลส่วนบุคคล ข้อมูลกิจการ ข้อมูลทางการเงิน
                 และเอกสารที่ข้าพเจ้าให้ไว้ ไปยัง <strong>{agencyName}</strong>{' '}
