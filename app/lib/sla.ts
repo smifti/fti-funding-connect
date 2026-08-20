@@ -1,3 +1,4 @@
+
 // ============================================
 // sla.ts — utility functions สำหรับคำนวณวันทำการ (business days) และสถานะ SLA
 // นับจันทร์-ศุกร์ ตัดวันหยุดพิเศษ (เสาร์-อาทิตย์คำนวณอัตโนมัติ, วันหยุดนักขัตฤกษ์มาจากตาราง holidays)
@@ -8,6 +9,8 @@ export type SlaConfig = {
   step2_days: number
   step3_days_low: number
   step3_days_high: number
+  step4_days_low: number
+  step4_days_high: number
   step3_threshold_amount: number
 }
 
@@ -119,7 +122,7 @@ export function getSlaStatus(
 }
 
 /**
- * เลือกจำนวนวัน SLA ของขั้นที่ 3 (ดำเนินการ → เสร็จสิ้น) ตามเกณฑ์วงเงิน
+ * เลือกจำนวนวัน SLA ของขั้นที่ 3 (หน่วยงานรับเรื่อง → อยู่ระหว่างการพิจารณา) ตามเกณฑ์วงเงิน
  * @param maxAmount วงเงินสูงสุดของ package (min_amount/max_amount)
  */
 export function getStep3SlaDays(
@@ -130,6 +133,21 @@ export function getStep3SlaDays(
     return config.step3_days_high
   }
   return config.step3_days_low
+}
+
+/**
+ * เลือกจำนวนวัน SLA ของขั้นที่ 4 (อยู่ระหว่างการพิจารณา → เสร็จสิ้น) ตามเกณฑ์วงเงิน
+ * ใช้เกณฑ์วงเงินตัวเดียวกับขั้นที่ 3 (step3_threshold_amount)
+ * @param maxAmount วงเงินสูงสุดของ package (min_amount/max_amount)
+ */
+export function getStep4SlaDays(
+  config: SlaConfig,
+  maxAmount: number | null
+): number {
+  if (maxAmount != null && maxAmount >= config.step3_threshold_amount) {
+    return config.step4_days_high
+  }
+  return config.step4_days_low
 }
 
 /**
