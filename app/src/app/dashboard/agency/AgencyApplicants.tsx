@@ -309,7 +309,10 @@ export default function AgencyApplicants({
                         let stepDeadline: Date | null = null
                         if (i > 0) {
                           const prevKey = STEPS[i - 1].key
-                          lineIsActive = st !== ADVANCE_STATE[step.model] && open
+                          // เดิมเงื่อนไขนี้ต้องรอให้หมุดก่อนหน้า "ผ่านเต็มรูปแบบ" (open) ก่อนถึงจะยอมโชว์เส้น SLA
+                          // แต่ anchor (step2/3/4_started_at) ถูกตั้งค่าไปแล้วตั้งแต่ตอนที่หมุดก่อนหน้าเปิดขึ้นมา/ถูกกดครั้งแรก
+                          // จึงต้องใช้แค่ "มี anchor แล้วหรือยัง" เป็นตัวตัดสิน ไม่ต้องรอ open ซึ่งเป็นคนละจังหวะกัน
+                          lineIsActive = st !== ADVANCE_STATE[step.model]
 
                           let startedAtStr: string | null = null
                           let slaDays = 0
@@ -327,7 +330,7 @@ export default function AgencyApplicants({
                             slaDays = getStep4SlaDays(slaConfig, a.packages?.max_amount ?? null)
                           }
 
-                          if (startedAtStr && open) {
+                          if (startedAtStr) {
                             const sla = getSlaStatus(new Date(startedAtStr), slaDays, holidaySet)
                             stepDeadline = sla.deadline
                             if (lineIsActive) lineSla = sla
