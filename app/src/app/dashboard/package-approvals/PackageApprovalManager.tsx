@@ -49,6 +49,7 @@ type Pkg = {
   cover_banner: ImageMeta | null
   cover_square: ImageMeta | null
   detail_images: ImageMeta[] | null
+  is_featured?: boolean
   package_rate_structures?: any | null
   profiles: { agency_name: string | null; full_name: string | null; agency_logo: string | null } | null
   package_approval_logs?: LogRow[]
@@ -108,6 +109,20 @@ export default function PackageApprovalManager({
   const [detail, setDetail] = useState<Pkg | null>(null)
   const [tab, setTab] = useState<TabKey>('pending') // default = รออนุมัติ
   const [showLog, setShowLog] = useState<string | null>(null)
+  // สถานะ "แนะนำ" ของแต่ละบริการ — เก็บแยกจาก initial เพื่อ toggle ได้ทันทีไม่ต้องรอ refresh หน้า
+  const [featuredMap, setFeaturedMap] = useState<Record<string, boolean>>(
+    Object.fromEntries(initial.map(p => [p.id, !!p.is_featured]))
+  )
+  const [featuredBusy, setFeaturedBusy] = useState<string | null>(null)
+
+  async function toggleFeatured(id: string) {
+    setFeaturedBusy(id)
+    const next = !featuredMap[id]
+    const { error } = await supabase.rpc('admin_set_package_featured', { p_package_id: id, p_featured: next })
+    setFeaturedBusy(null)
+    if (error) { setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
+    setFeaturedMap(prev => ({ ...prev, [id]: next }))
+  }
 
   async function decide(id: string, status: 'approved' | 'rejected' | 'pending', note: string | null = null) {
     setBusy(id); setMsg('')
@@ -155,6 +170,14 @@ export default function PackageApprovalManager({
             {statusLabel.text}
           </span>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {currentUser.role === 'admin' && (
+              <button className="btn btn-ghost btn-sm" disabled={featuredBusy === p.id}
+                onClick={() => toggleFeatured(p.id)}
+                title={featuredMap[p.id] ? 'ยกเลิกการแนะนำ' : 'ตั้งเป็นบริการแนะนำ'}
+                style={featuredMap[p.id] ? { color: '#166534', borderColor: '#166534' } : undefined}>
+                {featuredBusy === p.id ? '…' : featuredMap[p.id] ? '✓ แนะนำ' : '☆ แนะนำ'}
+              </button>
+            )}
             <button className="btn btn-ghost btn-sm" onClick={() => setDetail(p)}>รายละเอียด</button>
             {actions}
           </div>
@@ -357,9 +380,10 @@ export default function PackageApprovalManager({
       {/* Modal รายละเอียดบริการ — ใช้ pattern เดียวกับฝั่ง agency */}
       {detail && (
         <PackageDetailModal
-          pkg={detail}
+          pkg={{ ...detail, is_featured: featuredMap[detail.id] }}
           applicantCount={applicantCounts[detail.id] ?? 0}
           onClose={() => setDetail(null)}
+          mode={currentUser.role === 'admin' ? 'admin' : 'agency'}
         />
       )}
     </div>
