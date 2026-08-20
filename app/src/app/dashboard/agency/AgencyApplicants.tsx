@@ -361,6 +361,12 @@ export default function AgencyApplicants({
                               fontWeight: st !== 'pending' ? 600 : (open ? 600 : 400) }}>
                               {step.label}
                             </div>
+                            {step.model === 'coordinate' && st !== 'pending' && (
+                              <div style={{ fontSize: 11, marginTop: 2,
+                                color: st === 'in_progress' ? '#16a34a' : '#0284c7' }}>
+                                {STATE_LABEL[st]}
+                              </div>
+                            )}
                             {steps[step.key]?.note && (
                               <div style={{ fontSize: 11, color: st === 'failed' ? '#dc2626' : '#475569',
                                 marginTop: 2, maxWidth: 130, margin: '2px auto 0' }}>
@@ -411,21 +417,26 @@ export default function AgencyApplicants({
                         )}
 
                         {editStep.model === 'coordinate' && (
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                             <button className="btn btn-sm" disabled={busy === a.id}
                               style={{ background: '#0284c7' }}
                               onClick={() => setStep(a, editing.stepKey, 'coordinating', null)}>
                               🔵 อยู่ในระหว่างการประสานงาน
                             </button>
-                            <button className="btn btn-sm" disabled={busy === a.id}
-                              onClick={() => setStep(a, editing.stepKey, 'in_progress', null)}>
-                              🟢 อยู่ระหว่างดำเนินการ (ไปจุดถัดไป)
-                            </button>
-                            <button className="btn btn-sm btn-ghost" disabled={busy === a.id}
-                              onClick={() => setStep(a, editing.stepKey, 'pending', null)}>⚪ กลับเป็นรอ
-                            </button>
-                            <button className="btn btn-sm btn-ghost"
-                              onClick={() => { setEditing(null); setFailNote('') }}>ปิด</button>
+                            <textarea rows={2} placeholder="โน้ตเพิ่มเติม (ไม่บังคับ)"
+                              value={failNote} onChange={e => setFailNote(e.target.value)}
+                              style={{ width: '100%', fontSize: 13, padding: 6, borderRadius: 6, border: '1px solid #cbd5e1' }} />
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              <button className="btn btn-sm" disabled={busy === a.id}
+                                onClick={() => setStep(a, editing.stepKey, 'in_progress', failNote.trim() || null)}>
+                                🟢 อยู่ระหว่างดำเนินการ (ไปจุดถัดไป)
+                              </button>
+                              <button className="btn btn-sm btn-ghost" disabled={busy === a.id}
+                                onClick={() => setStep(a, editing.stepKey, 'pending', null)}>⚪ กลับเป็นรอ
+                              </button>
+                              <button className="btn btn-sm btn-ghost"
+                                onClick={() => { setEditing(null); setFailNote('') }}>ปิด</button>
+                            </div>
                           </div>
                         )}
 
