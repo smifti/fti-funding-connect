@@ -13,13 +13,33 @@ function LoginForm() {
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [needsConfirm, setNeedsConfirm] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resendMsg, setResendMsg] = useState('')
 
   const justConfirmed = searchParams.get('confirmed') === '1'
   const confirmError = searchParams.get('confirm_error') === '1'
   const justReset = searchParams.get('reset') === '1'
 
+  async function resendConfirmation() {
+    if (!email.trim()) return
+    setResending(true); setResendMsg('')
+    try {
+      const res = await fetch('/api/send-signup-confirmation-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      })
+      await res.json()
+    } catch {
+      // เงียบไว้ — ไม่บอกรายละเอียด กันการเดาว่าอีเมลไหนมีบัญชีอยู่ในระบบบ้าง
+    }
+    setResending(false)
+    setResendMsg('หากอีเมลนี้รอการยืนยันอยู่ เราได้ส่งลิงก์ยืนยันตัวตนไปให้ใหม่แล้ว กรุณาตรวจสอบกล่องข้อความ (รวมถึง Junk/Spam)')
+  }
+
   async function onSubmit() {
-    setErr(''); setLoading(true)
+    setErr(''); setNeedsConfirm(false); setResendMsg(''); setLoading(true)
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error || !data.user) {
       setLoading(false)
@@ -37,6 +57,7 @@ function LoginForm() {
       await supabase.auth.signOut()
       setLoading(false)
       setErr('บัญชีของท่านได้รับการอนุมัติแล้ว แต่ยังไม่ได้ยืนยันตัวตน กรุณาตรวจสอบอีเมลที่ระบบส่งให้และกดยืนยันก่อนเข้าสู่ระบบ')
+      setNeedsConfirm(true)
       return
     }
 
@@ -59,6 +80,16 @@ function LoginForm() {
           <div className="alert alert-err">ลิงก์ยืนยันไม่ถูกต้องหรือหมดอายุแล้ว กรุณาติดต่อผู้ดูแลระบบ</div>
         )}
         {err && <div className="alert alert-err">{err}</div>}
+        {needsConfirm && (
+          resendMsg ? (
+            <div className="alert alert-ok">{resendMsg}</div>
+          ) : (
+            <button className="btn btn-ghost btn-sm" onClick={resendConfirmation} disabled={resending}
+              style={{ marginBottom: 14 }}>
+              {resending ? 'กำลังส่ง…' : '📧 ส่งอีเมลยืนยันตัวตนอีกครั้ง'}
+            </button>
+          )
+        )}
         <div className="field">
           <label>อีเมล</label>
           <input type="email" value={email} onChange={e => setEmail(e.target.value)}
