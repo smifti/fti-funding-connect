@@ -72,6 +72,10 @@ export async function TopBar({ role }: { role: string }) {
                 style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
                 🏢 จัดการหน่วยงาน
               </a>
+              <a href="/dashboard/dsar-requests" className="btn btn-ghost btn-sm"
+                style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
+                📋 คำขอใช้สิทธิข้อมูล
+              </a>
             </>
           )}
           {isReviewer && (
@@ -100,6 +104,10 @@ export async function TopBar({ role }: { role: string }) {
               ⚙️ ตั้งค่าระบบ
             </a>
           )}
+          <a href="/dashboard/privacy" className="btn btn-ghost btn-sm"
+            style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
+            🔒 ความเป็นส่วนตัว
+          </a>
           <form action={signOut}>
             <button className="btn btn-ghost btn-sm" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>
               ➡️ ออกจากระบบ
