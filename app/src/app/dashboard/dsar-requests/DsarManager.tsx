@@ -59,6 +59,14 @@ export default function DsarManager({ initial }: { initial: Row[] }) {
     })
     setBusy(null)
     if (error) { setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
+    // แจ้งผู้ยื่นคำขอทาง email ว่าดำเนินการเสร็จแล้ว (fire-and-forget)
+    if (status === 'completed' || status === 'rejected') {
+      fetch('/api/notify-dsar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: id, type: 'resolved' }),
+      }).catch(() => {})
+    }
     setEditing(null); setNote('')
     router.refresh()
   }
