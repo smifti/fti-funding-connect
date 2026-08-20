@@ -29,6 +29,15 @@ const STATE_LABEL: Record<string, string> = {
   coordinating: 'อยู่ในระหว่างการประสานงาน', in_progress: 'อยู่ระหว่างดำเนินการ',
   waiting: 'รอรับเรื่องต่อ', done: 'เสร็จสิ้น',
 }
+// จุดที่ 4 (under_review) ใช้คำเรียกสถานะต่างจากจุดที่ 3 (agency_received) โดยเฉพาะ
+// (ค่า state ที่เก็บในฐานข้อมูลยังเป็น coordinating/in_progress เหมือนเดิม แค่ข้อความที่แสดงต่างกัน)
+function coordStateLabel(stepKey: string, state: string): string {
+  if (stepKey === 'under_review') {
+    if (state === 'coordinating') return 'อยู่ระหว่างการดำเนินการ'
+    if (state === 'in_progress') return 'เสร็จสิ้น'
+  }
+  return STATE_LABEL[state] ?? state
+}
 const ROLE_LABEL: Record<string, string> = {
   agency: 'หน่วยงาน', expert: 'ที่ปรึกษา', admin: 'ผู้ดูแลระบบ',
 }
@@ -372,7 +381,7 @@ export default function AgencyApplicants({
                             {step.model === 'coordinate' && st !== 'pending' && (
                               <div style={{ fontSize: 11, marginTop: 2,
                                 color: st === 'in_progress' ? '#16a34a' : '#0284c7' }}>
-                                {STATE_LABEL[st]}
+                                {coordStateLabel(step.key, st)}
                               </div>
                             )}
                             {steps[step.key]?.note && (
@@ -428,7 +437,7 @@ export default function AgencyApplicants({
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                             {editing.stepKey === 'under_review' ? (
                               <>
-                                <label style={{ fontSize: 12, color: '#475569' }}>เหตุผลที่อยู่ระหว่างประสานงาน</label>
+                                <label style={{ fontSize: 12, color: '#475569' }}>เหตุผลที่อยู่ระหว่างดำเนินการ</label>
                                 <select value={coordReason} onChange={e => setCoordReason(e.target.value)}
                                   style={{ width: '100%', fontSize: 13, padding: 6, borderRadius: 6, border: '1px solid #cbd5e1' }}>
                                   <option value="">— เลือกเหตุผล —</option>
@@ -447,7 +456,7 @@ export default function AgencyApplicants({
                                   style={{ background: '#0284c7' }}
                                   onClick={() => setStep(a, editing.stepKey, 'coordinating',
                                     coordReason === OTHER_REASON ? coordOtherText.trim() : coordReason)}>
-                                  🔵 อยู่ในระหว่างการประสานงาน
+                                  🔵 อยู่ระหว่างการดำเนินการ
                                 </button>
                               </>
                             ) : (
@@ -463,7 +472,9 @@ export default function AgencyApplicants({
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                               <button className="btn btn-sm" disabled={busy === a.id}
                                 onClick={() => setStep(a, editing.stepKey, 'in_progress', failNote.trim() || null)}>
-                                🟢 อยู่ระหว่างดำเนินการ (ไปจุดถัดไป)
+                                {editing.stepKey === 'under_review'
+                                  ? '🟢 เสร็จสิ้น (ไปจุดถัดไป)'
+                                  : '🟢 อยู่ระหว่างดำเนินการ (ไปจุดถัดไป)'}
                               </button>
                               <button className="btn btn-sm btn-ghost" disabled={busy === a.id}
                                 onClick={() => setStep(a, editing.stepKey, 'pending', null)}>⚪ กลับเป็นรอ
