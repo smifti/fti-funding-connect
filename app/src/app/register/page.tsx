@@ -30,6 +30,7 @@ export default function RegisterPage() {
   const [ok, setOk] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [pdpaAgreed, setPdpaAgreed] = useState(false)
   const set = (k: string) => (e: any) => setForm({ ...form, [k]: e.target.value })
 
   // สำหรับ role = agency: เลือกเข้าร่วมหน่วยงานที่มีอยู่แล้ว หรือสร้างใหม่
@@ -64,6 +65,10 @@ export default function RegisterPage() {
 
   async function onSubmit() {
     setErr(''); setOk('')
+    if (!pdpaAgreed) {
+      setErr('กรุณายืนยันว่าท่านได้อ่านและยินยอมตามประกาศความเป็นส่วนตัวก่อนลงทะเบียน')
+      return
+    }
     // บังคับกรอกเบอร์โทร สำหรับผู้ให้บริการ + ที่ปรึกษา
     if ((roleType === 'agency' || roleType === 'expert') && form.coordPhone.trim() === '') {
       setErr('กรุณากรอกเบอร์โทรศัพท์')
@@ -126,6 +131,12 @@ export default function RegisterPage() {
     }
 
     setLoading(false)
+
+    // บันทึกหลักฐานการยินยอม PDPA ตอนสมัครสมาชิก (fire-and-forget เหมือนอีเมลยืนยัน —
+    // ไม่ block การลงทะเบียนถ้าบันทึกไม่สำเร็จ เพราะ signUp() ผ่านไปแล้ว)
+    supabase.rpc('log_registration_consent', { p_role: roleType }).then(({ error: consentError }) => {
+      if (consentError) console.error('log_registration_consent failed:', consentError)
+    })
 
     // ส่งอีเมลยืนยันตัวตน (เฉพาะ SME) — ทำแบบ fire-and-forget ไม่รอผลลัพธ์ ไม่ block หน้าจอ
     sendConfirmationEmailIfSme(signUpData.user?.id)
@@ -295,6 +306,18 @@ export default function RegisterPage() {
             </button>
           </div>
         </div>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13,
+          color: '#475569', margin: '14px 0', cursor: 'pointer' }}>
+          <input type="checkbox" checked={pdpaAgreed} onChange={e => setPdpaAgreed(e.target.checked)}
+            style={{ marginTop: 2 }} />
+          <span>
+            ข้าพเจ้าได้อ่านและยินยอมตาม{' '}
+            <Link href="/privacy-notice" target="_blank" style={{ fontWeight: 600 }}>
+              ประกาศความเป็นส่วนตัว (Privacy Notice)
+            </Link>{' '}
+            ของระบบ FTI SME Funding Connect
+          </span>
+        </label>
         <button className="btn" onClick={onSubmit} disabled={loading}>
           {loading ? 'กำลังลงทะเบียน…' : 'ลงทะเบียน'}
         </button>
