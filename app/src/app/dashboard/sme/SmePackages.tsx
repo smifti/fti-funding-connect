@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 import PackageDetailModal from '../shared-packages/PackageDetailModal'
+import PdpaConsentModal from './PdpaConsentModal'
 
 const CATEGORY_LABELS: Record<string, string> = {
   credit: 'สินเชื่อ', innovation: 'นวัตกรรม', management: 'บริหารจัดการ',
@@ -88,6 +89,7 @@ export default function SmePackages({
   const [saved, setSaved] = useState<string[]>(savedIds)
   const [bookmarkBusy, setBookmarkBusy] = useState<string | null>(null)
   const [detail, setDetail] = useState<Pkg | null>(null)
+  const [consentPkg, setConsentPkg] = useState<Pkg | null>(null)
 
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('all')
@@ -130,14 +132,26 @@ export default function SmePackages({
     return list
   }, [packages, catFilter, search, sortBy, savedOnly, saved])
 
-  async function apply(pkgId: string) {
+  // เปิด modal ขอความยินยอม PDPA ก่อนส่งคำขอจริงทุกครั้ง
+  function startApply(pkg: Pkg) {
+    setConsentPkg(pkg)
+  }
+
+  async function confirmApply() {
+    if (!consentPkg) return
+    const pkgId = consentPkg.id
+    const agencyName = consentPkg.profiles?.agencies?.name ?? consentPkg.profiles?.agency_name ?? 'หน่วยงานผู้ให้บริการ'
     setBusy(pkgId); setMsg('')
-    const { error } = await supabase.from('package_applications').insert({
-      package_id: pkgId, sme_id: smeId,
+    // ใช้ RPC เดียว บันทึกทั้งใบสมัครและหลักฐานการยินยอม PDPA พร้อมกันแบบ atomic
+    const { error } = await supabase.rpc('apply_to_package_with_consent', {
+      p_package_id: pkgId,
+      p_agency_name_snapshot: agencyName,
+      p_package_title_snapshot: consentPkg.title,
     })
     setBusy(null)
-    if (error) { setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
+    if (error) { setMsg('เกิดข้อผิดพลาด: ' + error.message); setConsentPkg(null); return }
     setApplied(prev => [...prev, pkgId])
+    setConsentPkg(null)
     setDetail(null)
     router.refresh()
   }
@@ -289,7 +303,7 @@ export default function SmePackages({
                         ✓ สมัครแล้ว
                       </button>
                     ) : svc.canApply ? (
-                      <button className="btn btn-sm" disabled={busy === p.id} onClick={() => apply(p.id)}>
+                      <button className="btn btn-sm" disabled={busy === p.id} onClick={() => startApply(p)}>
                         {busy === p.id ? '…' : 'สนใจ / สมัคร'}
                       </button>
                     ) : (
@@ -315,10 +329,19 @@ export default function SmePackages({
           canApply={(SERVICE_INFO[detail.service_status ?? 'open'] ?? SERVICE_INFO.open).canApply}
           closedLabel={(SERVICE_INFO[detail.service_status ?? 'open'] ?? SERVICE_INFO.open).closedLabel}
           applying={busy === detail.id}
-          onApply={() => apply(detail.id)}
+          onApply={() => startApply(detail)}
           isSaved={saved.includes(detail.id)}
           onToggleSave={() => toggleSave(detail.id)}
           savingBookmark={bookmarkBusy === detail.id}
+        />
+      )}
+      {consentPkg && (
+        <PdpaConsentModal
+          packageTitle={consentPkg.title}
+          agencyName={consentPkg.profiles?.agencies?.name ?? consentPkg.profiles?.agency_name ?? 'หน่วยงานผู้ให้บริการ'}
+          loading={busy === consentPkg.id}
+          onCancel={() => setConsentPkg(null)}
+          onAccept={confirmApply}
         />
       )}
     </div>
