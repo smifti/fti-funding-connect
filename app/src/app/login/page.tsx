@@ -16,6 +16,7 @@ function LoginForm() {
 
   const justConfirmed = searchParams.get('confirmed') === '1'
   const confirmError = searchParams.get('confirm_error') === '1'
+  const justReset = searchParams.get('reset') === '1'
 
   async function onSubmit() {
     setErr(''); setLoading(true)
@@ -51,6 +52,9 @@ function LoginForm() {
         {justConfirmed && (
           <div className="alert alert-ok">ยืนยันตัวตนสำเร็จ กรุณาเข้าสู่ระบบ</div>
         )}
+        {justReset && (
+          <div className="alert alert-ok">ตั้งรหัสผ่านใหม่สำเร็จ กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่</div>
+        )}
         {confirmError && (
           <div className="alert alert-err">ลิงก์ยืนยันไม่ถูกต้องหรือหมดอายุแล้ว กรุณาติดต่อผู้ดูแลระบบ</div>
         )}
@@ -82,6 +86,9 @@ function LoginForm() {
               title={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}>
               {showPassword ? '🙈' : '👁'}
             </button>
+          </div>
+          <div style={{ textAlign: 'right', marginTop: 6 }}>
+            <Link href="/forgot-password" style={{ fontSize: 13 }}>ลืมรหัสผ่าน?</Link>
           </div>
         </div>
         <button className="btn" onClick={onSubmit} disabled={loading}>
