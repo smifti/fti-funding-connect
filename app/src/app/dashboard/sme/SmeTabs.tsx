@@ -46,6 +46,9 @@ const STATE_LABEL: Record<string, string> = {
 }
 // บางจุดใช้คำเรียกสถานะต่างจากค่า state ที่เก็บจริง — ต้องตรงกับ stepStatusLabel ใน AgencyApplicants.tsx
 function stepStatusLabel(stepKey: string, state: string): string {
+  if (stepKey === 'agency_received') {
+    if (state === 'in_progress') return 'เสร็จสิ้น'
+  }
   if (stepKey === 'under_review') {
     if (state === 'coordinating') return 'อยู่ระหว่างการดำเนินการ'
     if (state === 'in_progress') return 'เสร็จสิ้น'
@@ -134,7 +137,7 @@ function AppTimeline({ steps }: { steps: Record<string, any> }) {
                 {stepStatusLabel(step.key, st)}
               </div>
             )}
-            {s[step.key]?.note && (
+            {s[step.key]?.note && !(step.key === 'under_review' && st === 'in_progress') && (
               <div style={{ fontSize: 11, color: '#dc2626', marginTop: 2, maxWidth: 120, margin: '2px auto 0' }}>
                 {s[step.key].note}
               </div>
