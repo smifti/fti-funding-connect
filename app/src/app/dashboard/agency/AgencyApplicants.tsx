@@ -34,6 +34,9 @@ const STATE_LABEL: Record<string, string> = {
 //   จุดที่ 4 (under_review): coordinating → "อยู่ระหว่างการดำเนินการ", in_progress → "เสร็จสิ้น"
 //   จุดที่ 5 (completed):    waiting → "อนุมัติ" (เขียว), done → "ไม่อนุมัติ" (แดง)
 function stepStatusLabel(stepKey: string, state: string): string {
+  if (stepKey === 'agency_received') {
+    if (state === 'in_progress') return 'เสร็จสิ้น'
+  }
   if (stepKey === 'under_review') {
     if (state === 'coordinating') return 'อยู่ระหว่างการดำเนินการ'
     if (state === 'in_progress') return 'เสร็จสิ้น'
@@ -391,7 +394,7 @@ export default function AgencyApplicants({
                                 {stepStatusLabel(step.key, st)}
                               </div>
                             )}
-                            {steps[step.key]?.note && (
+                            {steps[step.key]?.note && !(step.key === 'under_review' && st === 'in_progress') && (
                               <div style={{ fontSize: 11, color: st === 'failed' ? '#dc2626' : '#475569',
                                 marginTop: 2, maxWidth: 130, margin: '2px auto 0' }}>
                                 {steps[step.key]?.note}
@@ -479,9 +482,7 @@ export default function AgencyApplicants({
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                               <button className="btn btn-sm" disabled={busy === a.id}
                                 onClick={() => setStep(a, editing.stepKey, 'in_progress', failNote.trim() || null)}>
-                                {editing.stepKey === 'under_review'
-                                  ? '🟢 เสร็จสิ้น (ไปจุดถัดไป)'
-                                  : '🟢 อยู่ระหว่างดำเนินการ (ไปจุดถัดไป)'}
+                                🟢 เสร็จสิ้น (ไปจุดถัดไป)
                               </button>
                               <button className="btn btn-sm btn-ghost" disabled={busy === a.id}
                                 onClick={() => setStep(a, editing.stepKey, 'pending', null)}>⚪ กลับเป็นรอ
