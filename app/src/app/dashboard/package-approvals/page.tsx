@@ -27,6 +27,7 @@ export default async function PackageApprovalsPage() {
       package_type, related_sectors, min_amount, max_amount, eligibility_criteria,
       loan_term, collateral_required, collateral_detail,
       cover_banner, cover_square, detail_images,
+      is_featured,
       package_rate_structures(*),
       profiles(agency_name, full_name, agency_logo),
       package_approval_logs(id, new_status, note, changed_by_name, changed_by_role, created_at)
