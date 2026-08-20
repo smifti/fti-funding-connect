@@ -49,7 +49,7 @@ export default async function SmeDashboard({ userId }: { userId: string }) {
     .order('created_at', { ascending: false })
     .maybeSingle()
   // แพ็กเกจที่อนุมัติแล้ว + เปิดอยู่ (RLS กรองให้เห็นเฉพาะที่ approved+active)
-  const { data: packages, error: packagesError } = await supabase
+  const { data: packages } = await supabase
     .from('packages')
     .select(`
       id, template_type, category, title, overview, description, price_amount, price_note,
@@ -61,7 +61,7 @@ export default async function SmeDashboard({ userId }: { userId: string }) {
       package_rate_structures(*),
       profiles (
         full_name, agency_name, agency_email, phone,
-        agencies ( name, logo, description, website, email, contact_name, contact_phone )
+        agencies!profiles_agency_id_fkey ( name, logo, description, website, email, contact_name, contact_phone )
       )
     `)
     .eq('approval_status', 'approved')
@@ -79,26 +79,14 @@ export default async function SmeDashboard({ userId }: { userId: string }) {
   const savedIds: string[] = savedIdsData ?? []
 
   return (
-    <>
-      {/* 🔧 DEBUG ชั่วคราว — ลบ <div> นี้ทิ้งหลังจากตรวจสอบปัญหาเสร็จแล้ว */}
-      <div style={{ background: '#fef3c7', border: '2px solid #f59e0b', borderRadius: 8,
-        padding: 12, margin: '0 0 16px', fontSize: 13, fontFamily: 'monospace' }}>
-        <strong>🔧 DEBUG:</strong> packages fetched = {packages?.length ?? 'null'}
-        {packagesError && (
-          <div style={{ color: '#dc2626', marginTop: 4 }}>
-            ERROR: {JSON.stringify(packagesError)}
-          </div>
-        )}
-      </div>
-      <SmeTabs
-        sme={sme}
-        requests={requestsWithNote}
-        health={health}
-        packages={packages ?? []}
-        appliedIds={appliedIds}
-        savedIds={savedIds}
-        myApplications={apps ?? []}
-      />
-    </>
+    <SmeTabs
+      sme={sme}
+      requests={requestsWithNote}
+      health={health}
+      packages={packages ?? []}
+      appliedIds={appliedIds}
+      savedIds={savedIds}
+      myApplications={apps ?? []}
+    />
   )
 }
