@@ -41,6 +41,14 @@ const STATE_ICON: Record<string, string> = {
 const STATE_LABEL: Record<string, string> = {
   coordinating: 'อยู่ในระหว่างการประสานงาน', in_progress: 'อยู่ระหว่างดำเนินการ',
 }
+// จุดที่ 4 (under_review) ใช้คำเรียกสถานะต่างจากจุดที่ 3 (agency_received) — ต้องตรงกับ AgencyApplicants.tsx
+function coordStateLabel(stepKey: string, state: string): string {
+  if (stepKey === 'under_review') {
+    if (state === 'coordinating') return 'อยู่ระหว่างการดำเนินการ'
+    if (state === 'in_progress') return 'เสร็จสิ้น'
+  }
+  return STATE_LABEL[state] ?? state
+}
 const COORDINATE_STEP_KEYS = ['agency_received', 'under_review']
 // ป้ายสถานะแพ็กเกจ (คำนวณจาก approval_status + service_status)
 function packageStatusBadge(pkg: any): { label: string; bg: string; color: string } | null {
@@ -117,7 +125,7 @@ function AppTimeline({ steps }: { steps: Record<string, any> }) {
             {COORDINATE_STEP_KEYS.includes(step.key) && st !== 'pending' && (
               <div style={{ fontSize: 10, marginTop: 2,
                 color: st === 'in_progress' ? '#16a34a' : '#0284c7' }}>
-                {STATE_LABEL[st]}
+                {coordStateLabel(step.key, st)}
               </div>
             )}
             {s[step.key]?.note && (
