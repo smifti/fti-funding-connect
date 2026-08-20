@@ -89,19 +89,23 @@ function buildConfirmEmailHtml(name: string, confirmUrl: string): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as { userId?: string }
-    const { userId } = body
+    const body = await req.json() as { userId?: string; email?: string }
+    const { userId, email } = body
 
-    if (!userId) {
-      return NextResponse.json({ ok: false, error: 'ไม่มี userId' }, { status: 400 })
+    if (!userId && !email) {
+      return NextResponse.json({ ok: false, error: 'ไม่มี userId หรือ email' }, { status: 400 })
     }
 
-    // ดึงอีเมล/ชื่อ/token ของ user คนนี้ผ่าน RPC (ไม่ต้อง login เพราะเพิ่งสมัครเสร็จใหม่ ๆ)
+    // ดึงอีเมล/ชื่อ/token ของ user คนนี้ผ่าน RPC (ไม่ต้อง login)
+    // ถ้ามี userId ใช้ RPC เดิม (เรียกตอนสมัครเสร็จใหม่ ๆ) ถ้ามีแต่ email ใช้ RPC ตัวใหม่
+    // (เรียกจากหน้า login ตอนผู้ใช้ล็อกอินไม่ได้เพราะยังไม่ยืนยัน และไม่มี userId ในมือ)
     const supabase = await createClient()
-    const { data, error: rpcError } = await supabase.rpc('get_signup_confirmation_info', { p_user_id: userId })
+    const { data, error: rpcError } = userId
+      ? await supabase.rpc('get_signup_confirmation_info', { p_user_id: userId })
+      : await supabase.rpc('get_signup_confirmation_info_by_email', { p_email: email })
 
     if (rpcError || !data || data.length === 0) {
-      // ไม่ error กลับไปแบบเปิดเผยรายละเอียด (ป้องกันการเดา user id เพื่อสืบข้อมูล)
+      // ไม่ error กลับไปแบบเปิดเผยรายละเอียด (ป้องกันการเดา user id/email เพื่อสืบข้อมูล)
       return NextResponse.json({ ok: false, error: 'ไม่พบข้อมูลสำหรับส่งอีเมล' }, { status: 200 })
     }
 
