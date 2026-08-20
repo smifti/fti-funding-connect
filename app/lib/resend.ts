@@ -6,7 +6,7 @@
 const RESEND_API_URL = 'https://api.resend.com/emails'
 
 // โดเมนที่ verify แล้วใน Resend — ใช้เป็นผู้ส่ง (from address)
-const FROM_ADDRESS = 'FTI SME Funding Connect <noreply@ftifunding.com>'
+const FROM_ADDRESS = 'FTI SME Funding Connect <info@ftifunding.com>'
 
 export type SendEmailParams = {
   to: string
