@@ -29,12 +29,18 @@ const STATE_LABEL: Record<string, string> = {
   coordinating: 'อยู่ในระหว่างการประสานงาน', in_progress: 'อยู่ระหว่างดำเนินการ',
   waiting: 'รอรับเรื่องต่อ', done: 'เสร็จสิ้น',
 }
-// จุดที่ 4 (under_review) ใช้คำเรียกสถานะต่างจากจุดที่ 3 (agency_received) โดยเฉพาะ
-// (ค่า state ที่เก็บในฐานข้อมูลยังเป็น coordinating/in_progress เหมือนเดิม แค่ข้อความที่แสดงต่างกัน)
-function coordStateLabel(stepKey: string, state: string): string {
+// บางจุดใช้คำเรียกสถานะต่างจากค่า state ที่เก็บจริงในฐานข้อมูล (เก็บ coordinating/in_progress/waiting/done
+// เหมือนเดิมทุกจุด แค่ข้อความที่แสดงบนจอต่างกันไปตามจุด):
+//   จุดที่ 4 (under_review): coordinating → "อยู่ระหว่างการดำเนินการ", in_progress → "เสร็จสิ้น"
+//   จุดที่ 5 (completed):    waiting → "อนุมัติ" (เขียว), done → "ไม่อนุมัติ" (แดง)
+function stepStatusLabel(stepKey: string, state: string): string {
   if (stepKey === 'under_review') {
     if (state === 'coordinating') return 'อยู่ระหว่างการดำเนินการ'
     if (state === 'in_progress') return 'เสร็จสิ้น'
+  }
+  if (stepKey === 'completed') {
+    if (state === 'waiting') return 'อนุมัติ'
+    if (state === 'done') return 'ไม่อนุมัติ'
   }
   return STATE_LABEL[state] ?? state
 }
@@ -91,15 +97,15 @@ const STATE_COLOR: Record<string, { border: string; bg: string; fg: string }> = 
   // จุดที่ 3/4 (coordinate model)
   coordinating: { border: '#0284c7', bg: '#0284c7', fg: '#fff' }, // ฟ้า: อยู่ในระหว่างการประสานงาน
   in_progress: { border: '#16a34a', bg: '#16a34a', fg: '#fff' }, // เขียว: อยู่ระหว่างดำเนินการ → ไปจุดถัดไป
-  // จุดที่ 5 (finish model)
-  waiting: { border: '#0284c7', bg: '#0284c7', fg: '#fff' }, // ฟ้า: รอรับเรื่องต่อ
-  done: { border: '#16a34a', bg: '#16a34a', fg: '#fff' }, // เขียว: เสร็จสิ้น
+  // จุดที่ 5 (finish model) — waiting = อนุมัติ (เขียว), done = ไม่อนุมัติ (แดง)
+  waiting: { border: '#16a34a', bg: '#16a34a', fg: '#fff' },
+  done: { border: '#dc2626', bg: '#dc2626', fg: '#fff' },
 }
 // ไอคอนกลางหมุดตามสถานะ (ไม่กำหนด = แสดงเลขลำดับจุดแทน)
 const STATE_ICON: Record<string, string> = {
-  passed: '✓', done: '✓', in_progress: '✓',
-  failed: '✕',
-  coordinating: '●', waiting: '●',
+  passed: '✓', in_progress: '✓', waiting: '✓',
+  failed: '✕', done: '✕',
+  coordinating: '●',
 }
 
 export default function AgencyApplicants({
@@ -371,17 +377,15 @@ export default function AgencyApplicants({
                               {STATE_ICON[st] ?? (i + 1)}
                             </button>
                             <div style={{ fontSize: 12, marginTop: 6,
-                              color: (st === 'passed' || st === 'done' || st === 'in_progress') ? '#16a34a'
-                                : st === 'failed' ? '#dc2626'
-                                : (st === 'coordinating' || st === 'waiting') ? '#0284c7'
-                                : (open ? '#ca8a04' : '#94a3b8'),
+                              color: st === 'pending' ? (open ? '#ca8a04' : '#94a3b8')
+                                : step.model === 'finish' ? '#334155'
+                                : c.border,
                               fontWeight: st !== 'pending' ? 600 : (open ? 600 : 400) }}>
                               {step.label}
                             </div>
-                            {step.model === 'coordinate' && st !== 'pending' && (
-                              <div style={{ fontSize: 11, marginTop: 2,
-                                color: st === 'in_progress' ? '#16a34a' : '#0284c7' }}>
-                                {coordStateLabel(step.key, st)}
+                            {(step.model === 'coordinate' || step.model === 'finish') && st !== 'pending' && (
+                              <div style={{ fontSize: 11, marginTop: 2, color: c.border, fontWeight: 600 }}>
+                                {stepStatusLabel(step.key, st)}
                               </div>
                             )}
                             {steps[step.key]?.note && (
@@ -489,21 +493,22 @@ export default function AgencyApplicants({
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                             <div style={{ display: 'flex', gap: 8 }}>
                               <button className="btn btn-sm" disabled={busy === a.id}
-                                style={{ background: '#0284c7' }}
+                                style={{ background: '#16a34a' }}
                                 onClick={() => setStep(a, editing.stepKey, 'waiting', null)}>
-                                🔵 รอรับเรื่องต่อ
+                                🟢 อนุมัติ
                               </button>
                               <button className="btn btn-sm btn-ghost" disabled={busy === a.id}
                                 onClick={() => setStep(a, editing.stepKey, 'pending', null)}>⚪ กลับเป็นรอ
                               </button>
                             </div>
-                            <textarea rows={2} placeholder="เหตุผล/รายละเอียดตอนปิดจบ (จำเป็นต้องกรอก)"
+                            <textarea rows={2} placeholder="เหตุผลที่ไม่อนุมัติ (จำเป็นต้องกรอก)"
                               value={failNote} onChange={e => setFailNote(e.target.value)}
                               style={{ width: '100%', fontSize: 13, padding: 6, borderRadius: 6, border: '1px solid #cbd5e1' }} />
                             <div style={{ display: 'flex', gap: 8 }}>
                               <button className="btn btn-sm" disabled={busy === a.id || !failNote.trim()}
+                                style={{ background: '#dc2626' }}
                                 onClick={() => setStep(a, editing.stepKey, 'done', failNote.trim())}>
-                                🟢 เสร็จสิ้น
+                                🔴 ไม่อนุมัติ
                               </button>
                               <button className="btn btn-sm btn-ghost"
                                 onClick={() => { setEditing(null); setFailNote('') }}>ปิด</button>
