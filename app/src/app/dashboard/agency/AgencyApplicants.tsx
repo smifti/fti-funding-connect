@@ -300,8 +300,10 @@ export default function AgencyApplicants({
                         const colorKey = st === 'pending' && open ? 'active' : st
                         const c = STATE_COLOR[colorKey] ?? STATE_COLOR.pending
 
-                        // คำนวณสถานะ SLA ของ "เส้นที่นำไปสู่หมุดนี้" (ช่วงเวลานับตั้งแต่หมุดก่อนหน้า i-1 ผ่าน จนถึงตอนนี้)
-                        // badge "เหลือ/เกิน กี่วัน" แสดงเมื่อ "จุดปลายทาง" มีสถานะแล้ว ยกเว้นจุด 4→5 ที่แสดงตั้งแต่จุด 4 (ต้นทาง) มีสถานะ
+                        // คำนวณสถานะ SLA ของ "เส้นที่นำไปสู่หมุดนี้" — badge "เหลือ/เกิน กี่วัน":
+                        //   จุดทั่วไป (1→2, 2→3, 3→4): ขึ้นทันทีที่จุดปลายทาง "active" (open = เปิดให้กดได้แล้ว)
+                        //   จุด 4→5 (ข้อยกเว้น): ไม่ต้องรอจุด 5 active — ขึ้นทันทีที่จุด 4 (ต้นทาง) มีสถานะแล้ว
+                        //     (ตรงกับ anchor step4_started_at ที่ตั้งตั้งแต่จุด 4 มีสถานะครั้งแรกอยู่แล้ว)
                         let lineSla: ReturnType<typeof getSlaStatus> | null = null
                         let lineIsActive = false
                         // วันที่ครบกำหนดของหมุดนี้ (แสดงเหนือหมุด) — คำนวณไม่ว่าหมุดจะ passed หรือ active ก็ตาม
@@ -309,17 +311,13 @@ export default function AgencyApplicants({
                         let stepDeadline: Date | null = null
                         if (i > 0) {
                           const prevKey = STEPS[i - 1].key
-                          // เงื่อนไขว่า badge นับวันควรเริ่มแสดงเมื่อไหร่ ต่างกันตามจุด:
-                          //   จุดทั่วไป (1→2, 2→3, 3→4): แสดงเมื่อ "จุดปลายทาง" (หมุดนี้เอง) มีสถานะแล้ว (ไม่ใช่ pending ว่างเปล่า)
-                          //   จุด 4→5 (ข้อยกเว้น): จุด 5 (ปลายทาง) ไม่ต้องมีสถานะ — แสดงตั้งแต่จุด 4 (ต้นทาง) มีสถานะแล้วพอ
-                          //     (ซึ่งตรงกับ anchor step4_started_at ที่ตั้งค่าไว้แล้วตอนจุด 4 มีสถานะครั้งแรก)
-                          const showSlaBadge = step.key === 'completed' ? true : st !== 'pending'
+                          const showSlaBadge = step.key === 'completed' ? true : open
                           lineIsActive = st !== ADVANCE_STATE[step.model] && showSlaBadge
 
                           let startedAtStr: string | null = null
                           let slaDays = 0
                           if (prevKey === 'submitted') {
-                            startedAtStr = a.step1_started_at
+                            startedAtStr = a.step1_started_at ?? a.created_at
                             slaDays = slaConfig.step1_days
                           } else if (prevKey === 'screening') {
                             startedAtStr = a.step2_started_at
@@ -335,7 +333,7 @@ export default function AgencyApplicants({
                           if (startedAtStr) {
                             const sla = getSlaStatus(new Date(startedAtStr), slaDays, holidaySet)
                             stepDeadline = sla.deadline
-                            if (lineIsActive && showSlaBadge) lineSla = sla
+                            if (lineIsActive) lineSla = sla
                           }
                         }
 
