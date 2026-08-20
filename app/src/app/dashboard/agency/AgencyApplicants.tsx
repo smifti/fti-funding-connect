@@ -32,6 +32,11 @@ const STATE_LABEL: Record<string, string> = {
 const ROLE_LABEL: Record<string, string> = {
   agency: 'หน่วยงาน', expert: 'ที่ปรึกษา', admin: 'ผู้ดูแลระบบ',
 }
+// ตัวเลือกเหตุผล dropdown เฉพาะจุดที่ 4 (under_review) ตอนกด "อยู่ในระหว่างการประสานงาน"
+const UNDER_REVIEW_COORDINATE_REASONS = [
+  'ติดตามเอกสาร', 'อยู่ระหว่างประเมินหลักประกัน', 'อยู่ระหว่างต่อรอง', 'รอผลอนุมัติ',
+]
+const OTHER_REASON = 'อื่น ๆ'
 
 type StepState = { state: string; note?: string }
 type LogRow = {
@@ -107,6 +112,9 @@ export default function AgencyApplicants({
   const [msg, setMsg] = useState('')
   const [editing, setEditing] = useState<{ appId: string; stepKey: string } | null>(null)
   const [failNote, setFailNote] = useState('')
+  // ตัวเลือกเหตุผล dropdown ตอนกด "ประสานงาน" ที่จุดที่ 4 (under_review) โดยเฉพาะ
+  const [coordReason, setCoordReason] = useState('')
+  const [coordOtherText, setCoordOtherText] = useState('')
   const [showLog, setShowLog] = useState<string | null>(null)
   const [localFilter, setLocalFilter] = useState<string | null>(filterPackageId ?? null)
 
@@ -335,7 +343,7 @@ export default function AgencyApplicants({
                             )}
                             <button
                               disabled={!clickable}
-                              onClick={() => { setEditing({ appId: a.id, stepKey: step.key }); setFailNote(steps[step.key]?.note ?? ''); setMsg('') }}
+                              onClick={() => { setEditing({ appId: a.id, stepKey: step.key }); setFailNote(steps[step.key]?.note ?? ''); setCoordReason(''); setCoordOtherText(''); setMsg('') }}
                               title={
                                 clickable ? `กำหนดสถานะ: ${step.label}`
                                 : !open ? 'ต้องผ่านหมุดก่อนหน้าก่อน'
@@ -418,11 +426,37 @@ export default function AgencyApplicants({
 
                         {editStep.model === 'coordinate' && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            <button className="btn btn-sm" disabled={busy === a.id}
-                              style={{ background: '#0284c7' }}
-                              onClick={() => setStep(a, editing.stepKey, 'coordinating', null)}>
-                              🔵 อยู่ในระหว่างการประสานงาน
-                            </button>
+                            {editing.stepKey === 'under_review' ? (
+                              <>
+                                <label style={{ fontSize: 12, color: '#475569' }}>เหตุผลที่อยู่ระหว่างประสานงาน</label>
+                                <select value={coordReason} onChange={e => setCoordReason(e.target.value)}
+                                  style={{ width: '100%', fontSize: 13, padding: 6, borderRadius: 6, border: '1px solid #cbd5e1' }}>
+                                  <option value="">— เลือกเหตุผล —</option>
+                                  {UNDER_REVIEW_COORDINATE_REASONS.map(r => (
+                                    <option key={r} value={r}>{r}</option>
+                                  ))}
+                                  <option value={OTHER_REASON}>อื่น ๆ (ใส่เหตุผล)</option>
+                                </select>
+                                {coordReason === OTHER_REASON && (
+                                  <textarea rows={2} placeholder="ระบุเหตุผล"
+                                    value={coordOtherText} onChange={e => setCoordOtherText(e.target.value)}
+                                    style={{ width: '100%', fontSize: 13, padding: 6, borderRadius: 6, border: '1px solid #cbd5e1' }} />
+                                )}
+                                <button className="btn btn-sm" disabled={busy === a.id || !coordReason
+                                  || (coordReason === OTHER_REASON && !coordOtherText.trim())}
+                                  style={{ background: '#0284c7' }}
+                                  onClick={() => setStep(a, editing.stepKey, 'coordinating',
+                                    coordReason === OTHER_REASON ? coordOtherText.trim() : coordReason)}>
+                                  🔵 อยู่ในระหว่างการประสานงาน
+                                </button>
+                              </>
+                            ) : (
+                              <button className="btn btn-sm" disabled={busy === a.id}
+                                style={{ background: '#0284c7' }}
+                                onClick={() => setStep(a, editing.stepKey, 'coordinating', null)}>
+                                🔵 อยู่ในระหว่างการประสานงาน
+                              </button>
+                            )}
                             <textarea rows={2} placeholder="โน้ตเพิ่มเติม (ไม่บังคับ)"
                               value={failNote} onChange={e => setFailNote(e.target.value)}
                               style={{ width: '100%', fontSize: 13, padding: 6, borderRadius: 6, border: '1px solid #cbd5e1' }} />
@@ -435,7 +469,7 @@ export default function AgencyApplicants({
                                 onClick={() => setStep(a, editing.stepKey, 'pending', null)}>⚪ กลับเป็นรอ
                               </button>
                               <button className="btn btn-sm btn-ghost"
-                                onClick={() => { setEditing(null); setFailNote('') }}>ปิด</button>
+                                onClick={() => { setEditing(null); setFailNote(''); setCoordReason(''); setCoordOtherText('') }}>ปิด</button>
                             </div>
                           </div>
                         )}
