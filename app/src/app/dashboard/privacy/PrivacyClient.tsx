@@ -54,13 +54,21 @@ export default function PrivacyClient({ consents, requests }: { consents: Consen
 
   async function submit() {
     setLoading(true); setMsg('')
-    const { error } = await supabase.from('dsar_requests').insert({
+    const { data: inserted, error } = await supabase.from('dsar_requests').insert({
       request_type: requestType,
       details: details.trim() || null,
       related_consent_id: requestType === 'withdraw_consent' && relatedConsentId ? relatedConsentId : null,
-    })
+    }).select('id').single()
     setLoading(false)
     if (error) { setMsg('เกิดข้อผิดพลาด: ' + error.message); return }
+    // แจ้ง admin ทาง email ว่ามีคำขอใหม่ (fire-and-forget ไม่ block UI ถ้าส่งไม่สำเร็จ)
+    if (inserted?.id) {
+      fetch('/api/notify-dsar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: inserted.id, type: 'new' }),
+      }).catch(() => {})
+    }
     setDetails(''); setRelatedConsentId(''); setShowForm(false)
     router.refresh()
   }
