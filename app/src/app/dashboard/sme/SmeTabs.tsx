@@ -32,24 +32,30 @@ const STATE_COLOR: Record<string, { border: string; bg: string; fg: string }> = 
   failed: { border: '#dc2626', bg: '#dc2626', fg: '#fff' },
   coordinating: { border: '#0284c7', bg: '#0284c7', fg: '#fff' },
   in_progress: { border: '#16a34a', bg: '#16a34a', fg: '#fff' },
-  waiting: { border: '#0284c7', bg: '#0284c7', fg: '#fff' },
-  done: { border: '#16a34a', bg: '#16a34a', fg: '#fff' },
+  // จุดที่ 5 — waiting = อนุมัติ (เขียว), done = ไม่อนุมัติ (แดง)
+  waiting: { border: '#16a34a', bg: '#16a34a', fg: '#fff' },
+  done: { border: '#dc2626', bg: '#dc2626', fg: '#fff' },
 }
 const STATE_ICON: Record<string, string> = {
-  passed: '✓', done: '✓', in_progress: '✓', failed: '✕', coordinating: '●', waiting: '●',
+  passed: '✓', in_progress: '✓', waiting: '✓',
+  failed: '✕', done: '✕',
+  coordinating: '●',
 }
 const STATE_LABEL: Record<string, string> = {
   coordinating: 'อยู่ในระหว่างการประสานงาน', in_progress: 'อยู่ระหว่างดำเนินการ',
 }
-// จุดที่ 4 (under_review) ใช้คำเรียกสถานะต่างจากจุดที่ 3 (agency_received) — ต้องตรงกับ AgencyApplicants.tsx
-function coordStateLabel(stepKey: string, state: string): string {
+// บางจุดใช้คำเรียกสถานะต่างจากค่า state ที่เก็บจริง — ต้องตรงกับ stepStatusLabel ใน AgencyApplicants.tsx
+function stepStatusLabel(stepKey: string, state: string): string {
   if (stepKey === 'under_review') {
     if (state === 'coordinating') return 'อยู่ระหว่างการดำเนินการ'
     if (state === 'in_progress') return 'เสร็จสิ้น'
   }
+  if (stepKey === 'completed') {
+    if (state === 'waiting') return 'อนุมัติ'
+    if (state === 'done') return 'ไม่อนุมัติ'
+  }
   return STATE_LABEL[state] ?? state
 }
-const COORDINATE_STEP_KEYS = ['agency_received', 'under_review']
 // ป้ายสถานะแพ็กเกจ (คำนวณจาก approval_status + service_status)
 function packageStatusBadge(pkg: any): { label: string; bg: string; color: string } | null {
   if (!pkg) return null
@@ -116,16 +122,16 @@ function AppTimeline({ steps }: { steps: Record<string, any> }) {
               {STATE_ICON[st] ?? (i + 1)}
             </div>
             <div style={{ fontSize: 11, marginTop: 6,
-              color: (st === 'passed' || st === 'done' || st === 'in_progress') ? '#16a34a'
-                : st === 'failed' ? '#dc2626'
-                : (st === 'coordinating' || st === 'waiting') ? '#0284c7' : '#94a3b8',
+              color: st === 'pending' ? '#94a3b8'
+                : step.key === 'completed' ? '#334155'
+                : c.border,
               fontWeight: st !== 'pending' ? 600 : 400 }}>
               {step.label}
             </div>
-            {COORDINATE_STEP_KEYS.includes(step.key) && st !== 'pending' && (
-              <div style={{ fontSize: 10, marginTop: 2,
-                color: st === 'in_progress' ? '#16a34a' : '#0284c7' }}>
-                {coordStateLabel(step.key, st)}
+            {(step.key === 'agency_received' || step.key === 'under_review' || step.key === 'completed')
+              && st !== 'pending' && (
+              <div style={{ fontSize: 10, marginTop: 2, color: c.border, fontWeight: 600 }}>
+                {stepStatusLabel(step.key, st)}
               </div>
             )}
             {s[step.key]?.note && (
