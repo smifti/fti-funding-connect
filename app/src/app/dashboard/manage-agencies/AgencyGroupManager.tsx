@@ -14,7 +14,19 @@ type Agency = {
   contact_phone: string | null
   created_at: string
   member_count: number
+  categories: string[]
 }
+
+const CATEGORIES: [string, string][] = [
+  ['credit', 'สินเชื่อ'],
+  ['innovation', 'นวัตกรรม'],
+  ['management', 'บริหารจัดการ'],
+  ['marketing', 'การตลาด'],
+  ['production', 'การผลิต'],
+  ['upskill', 'Upskill / Reskill'],
+  ['other', 'อื่น ๆ (ESG)'],
+]
+const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(CATEGORIES)
 
 type UnassignedUser = {
   id: string
@@ -69,7 +81,12 @@ export default function AgencyGroupManager({
   // สำหรับ admin แก้ไขข้อมูลหน่วยงานที่มีอยู่แล้ว
   const [editModalAgency, setEditModalAgency] = useState<Agency | null>(null)
   const [editForm, setEditForm] = useState<AgencyFormState>(emptyForm)
+  const [editCats, setEditCats] = useState<string[]>([])
   const [editBusy, setEditBusy] = useState(false)
+
+  function toggleEditCat(c: string) {
+    setEditCats(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])
+  }
 
   async function assignToAgency(userId: string) {
     const agencyId = selectedAgencyFor[userId]
@@ -162,6 +179,7 @@ export default function AgencyGroupManager({
       contact_name: a.contact_name ?? '',
       contact_phone: a.contact_phone ?? '',
     })
+    setEditCats(a.categories ?? [])
     setEditModalAgency(a)
   }
 
@@ -182,6 +200,12 @@ export default function AgencyGroupManager({
     })
     setEditBusy(false)
     if (error) { setMsg('แก้ไขไม่สำเร็จ: ' + error.message); return }
+
+    // บันทึกหมวดหมู่แยกอีก RPC หนึ่ง (ตัวใหม่ที่เพิ่งย้ายมาจากระดับผู้ใช้)
+    const { error: catError } = await supabase.rpc('admin_set_agency_categories', {
+      p_agency_id: editModalAgency.id, p_categories: editCats,
+    })
+    if (catError) { setMsg('บันทึกข้อมูลหน่วยงานสำเร็จ แต่บันทึกหมวดหมู่ไม่สำเร็จ: ' + catError.message); return }
 
     setMsg(`แก้ไขข้อมูล "${editForm.name.trim()}" เรียบร้อยแล้ว`)
     setEditModalAgency(null)
@@ -213,6 +237,18 @@ export default function AgencyGroupManager({
                         {a.contact_name && <> · ผู้ติดต่อ: {a.contact_name}</>}
                         {a.contact_phone && <> · {a.contact_phone}</>}
                       </div>
+                      {a.categories && a.categories.length > 0 ? (
+                        <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {a.categories.map(c => (
+                            <span key={c} style={{ fontSize: 11, background: '#eef2ff', color: '#4338ca',
+                              padding: '1px 8px', borderRadius: 8, fontWeight: 600 }}>
+                              {CATEGORY_LABELS[c] ?? c}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 4 }}>ยังไม่ได้ตั้งหมวดหมู่</div>
+                      )}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -437,6 +473,21 @@ export default function AgencyGroupManager({
               <div className="field" style={{ margin: 0 }}>
                 <label>เว็บไซต์</label>
                 <input value={editForm.website} onChange={e => setEditForm(f => ({ ...f, website: e.target.value }))} />
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label>หมวดหมู่ที่หน่วยงานนี้รับผิดชอบ</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {CATEGORIES.map(([val, label]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      className={`cat-chip ${editCats.includes(val) ? 'active' : ''}`}
+                      onClick={() => toggleEditCat(val)}
+                    >
+                      {label}{editCats.includes(val) ? ' ✓' : ''}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
