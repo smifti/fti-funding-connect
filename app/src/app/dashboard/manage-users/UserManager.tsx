@@ -70,6 +70,8 @@ export default function UserManager({
   function toggleCat(c: string) {
     setCats(cats.includes(c) ? cats.filter(x => x !== c) : [...cats, c])
   }
+  // หมายเหตุ: ไม่มี UI ให้แก้ cats ต่อแล้ว (ย้ายไปหน้าจัดการหน่วยงาน) แต่ยังคงส่งค่าเดิมไปกับ
+  // RPC เดิมตอนบันทึก เพื่อไม่เปลี่ยนพฤติกรรม/ฟิลด์ของฟังก์ชันเดิมที่มีอยู่แล้ว
   async function save(userId: string) {
     setSaving(true); setMsg('')
     const { error } = await supabase.rpc('admin_update_role', {
@@ -161,13 +163,10 @@ export default function UserManager({
                             <input value={agencyName} onChange={e => setAgencyName(e.target.value)}
                               placeholder="ชื่อหน่วยงาน เช่น SME D Bank"
                               style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 8, marginBottom: 8 }} />
-                            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>เลือกด้านที่รับผิดชอบ:</div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-                              {CATEGORY_OPTIONS.map(([v, l]) => (
-                                <button key={v} type="button"
-                                  className={`cat-chip ${cats.includes(v) ? 'active' : ''}`}
-                                  onClick={() => toggleCat(v)}>{l}</button>
-                              ))}
+                            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 10, lineHeight: 1.5 }}>
+                              หมวดหมู่ที่หน่วยงานรับผิดชอบ ย้ายไปตั้งค่าที่หน้า{' '}
+                              <a href="/dashboard/manage-agencies" style={{ fontWeight: 600 }}>จัดการหน่วยงาน</a>{' '}
+                              แล้ว (ใช้ค่าเดียวกันทุกคนในหน่วยงานเดียวกัน)
                             </div>
                           </>
                         )}
