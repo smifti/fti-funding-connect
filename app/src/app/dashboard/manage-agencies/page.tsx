@@ -17,6 +17,15 @@ export default async function ManageAgenciesPage() {
   const { data: agencies } = await supabase.rpc('admin_list_agencies')
   const { data: unassignedUsers } = await supabase.rpc('admin_list_unassigned_agency_users')
 
+  // ดึงหมวดหมู่ของแต่ละหน่วยงานจาก agencies โดยตรง (คอลัมน์ใหม่ที่เพิ่งย้ายมา)
+  // แล้ว merge เข้ากับผลลัพธ์จาก RPC เดิมด้วย id — ไม่แตะ RPC เดิมเลย
+  const { data: categoryRows } = await supabase.from('agencies').select('id, categories')
+  const categoryMap = new Map((categoryRows ?? []).map(r => [r.id, r.categories ?? []]))
+  const agenciesWithCategories = (agencies ?? []).map((a: any) => ({
+    ...a,
+    categories: categoryMap.get(a.id) ?? [],
+  }))
+
   return (
     <>
       <TopBar role="admin" />
@@ -27,7 +36,7 @@ export default async function ManageAgenciesPage() {
             จัดกลุ่ม user ที่เป็นหน่วยงานเดียวกันให้ใช้ข้อมูลหน่วยงานร่วมกัน (โลโก้ / ชื่อ / คำอธิบาย / ผู้ติดต่อ)
           </p>
           <AgencyGroupManager
-            initialAgencies={agencies ?? []}
+            initialAgencies={agenciesWithCategories}
             initialUnassigned={unassignedUsers ?? []}
           />
         </div>
